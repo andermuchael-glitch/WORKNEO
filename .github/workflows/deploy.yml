@@ -32,6 +32,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Add PWA files to build
+        run: |
+          cp manifest.webmanifest dist/manifest.webmanifest
+          cp sw.js dist/sw.js
+          cp icon.svg dist/icon.svg
+          cp index.html dist/404.html
+
+      - name: Verify Pages package
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          echo "Arquivos publicados:"
+          find dist -maxdepth 2 -type f -print
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
