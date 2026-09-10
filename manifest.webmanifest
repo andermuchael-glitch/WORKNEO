@@ -1,0 +1,10 @@
+{
+  "name": "Almoxarifado",
+  "short_name": "Almoxarifado",
+  "description": "Controle de listas, produtos, cores e quantidades.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#1769e0",
+  "background_color": "#f6f8fb"
+}
