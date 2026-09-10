@@ -1,10 +1,15 @@
 {
   "name": "Almoxarifado",
   "short_name": "Almoxarifado",
-  "description": "Controle de listas, produtos, cores e quantidades.",
+  "description": "Almoxarifado de produtos, cores, listas e lançamentos de quantidade.",
+  "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#1769e0",
-  "background_color": "#f6f8fb"
+  "background_color": "#10141c",
+  "icons": [
+    {"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
 }
