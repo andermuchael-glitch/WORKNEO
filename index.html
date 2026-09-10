@@ -8,16 +8,22 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="./manifest.webmanifest?v=3" />
+    <link rel="icon" href="./icon.svg?v=3" type="image/svg+xml" />
     <title>Almoxarifado</title>
     <style>body{margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#172033}.boot{min-height:100vh;display:grid;place-items:center;text-align:center}.boot-card{padding:32px}.boot-icon{font-size:52px}.boot h1{margin:10px 0 6px}.boot p{color:#667085}</style>
     <script>
+      // Mantém o app instalável. Não remover o Service Worker: ele é necessário
+      // para que a versão instalada funcione como aplicativo.
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())));
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js', {scope:'./'}).catch(() => {});
+        });
       }
     </script>
   </head>
   <body>
     <div id="root"><div class="boot"><div class="boot-card"><div class="boot-icon">📦</div><h1>Almoxarifado</h1><p>Carregando aplicativo...</p></div></div></div>
-    <script type="module" src="./src/main.jsx?v=20260910-2"></script>
+    <script type="module" src="./src/main.jsx?v=20260910-3"></script>
   </body>
 </html>
