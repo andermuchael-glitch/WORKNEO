@@ -1,15 +1,17 @@
 {
+  "id": "/WORKNEO/",
   "name": "Almoxarifado",
   "short_name": "Almoxarifado",
   "description": "Almoxarifado de produtos, cores, listas e lançamentos de quantidade.",
   "lang": "pt-BR",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/WORKNEO/",
+  "scope": "/WORKNEO/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#1769e0",
   "background_color": "#10141c",
+  "prefer_related_applications": false,
   "icons": [
-    {"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {"src":"/WORKNEO/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
   ]
 }
