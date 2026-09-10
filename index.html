@@ -11,7 +11,6 @@
     <title>Almoxarifado</title>
     <style>body{margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#172033}.boot{min-height:100vh;display:grid;place-items:center;text-align:center}.boot-card{padding:32px}.boot-icon{font-size:52px}.boot h1{margin:10px 0 6px}.boot p{color:#667085}</style>
     <script>
-      // Remove versões antigas do Service Worker que poderiam manter a tela branca.
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())));
       }
@@ -19,6 +18,6 @@
   </head>
   <body>
     <div id="root"><div class="boot"><div class="boot-card"><div class="boot-icon">📦</div><h1>Almoxarifado</h1><p>Carregando aplicativo...</p></div></div></div>
-    <script type="module" src="./src/main.jsx"></script>
+    <script type="module" src="./src/main.jsx?v=20260910-2"></script>
   </body>
 </html>
