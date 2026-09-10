@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: './',
+  // GitHub Pages publica este projeto em /WORKNEO/.
+  base: '/WORKNEO/',
   plugins: [
     react(),
     VitePWA({
@@ -15,8 +16,8 @@ export default defineConfig({
         theme_color: '#1769e0',
         background_color: '#f6f8fb',
         display: 'standalone',
-        start_url: './',
-        scope: './',
+        start_url: '/WORKNEO/',
+        scope: '/WORKNEO/',
         icons: []
       },
       workbox: {
