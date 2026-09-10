@@ -9,29 +9,36 @@ const PRODUCTS = [
 const COLORS=['LILÁS','VERDE PALMEIRAS','CELESTE','LARANJA','VERDE ÁGUA','MARROM','CREME','BRANCO','PRETO','ROYAL','MARINHO','VERMELHO','PINK','ROSA BEBÊ','VERDE','AMARELO','BEGE'];
 const keyOf=(p,c)=>`${p}__${c}`;
 
+function readJSON(key, fallback){
+  try { const raw=localStorage.getItem(key); if(!raw) return fallback; const value=JSON.parse(raw); return value ?? fallback; }
+  catch { return fallback; }
+}
+function safeArray(key){ const value=readJSON(key,[]); return Array.isArray(value)?value:[]; }
+function safeText(key){ try { return localStorage.getItem(key)||''; } catch { return ''; } }
+
 function App(){
- const [dark,setDark]=useState(()=>localStorage.getItem('almox-theme')==='dark');
- const [lists,setLists]=useState(()=>JSON.parse(localStorage.getItem('almox-lists')||'[]'));
- const [current,setCurrent]=useState(()=>localStorage.getItem('almox-current')||'');
+ const [dark,setDark]=useState(()=>safeText('almox-theme')==='dark');
+ const [lists,setLists]=useState(()=>safeArray('almox-lists'));
+ const [current,setCurrent]=useState(()=>safeText('almox-current'));
  const [product,setProduct]=useState(''); const [color,setColor]=useState('');
  const [qty,setQty]=useState(''); const [search,setSearch]=useState(''); const [view,setView]=useState('list');
  const [calcOpen,setCalcOpen]=useState(false); const [listModal,setListModal]=useState(false); const [listName,setListName]=useState('');
- useEffect(()=>{localStorage.setItem('almox-theme',dark?'dark':'light')},[dark]);
- useEffect(()=>{localStorage.setItem('almox-lists',JSON.stringify(lists))},[lists]);
- useEffect(()=>{localStorage.setItem('almox-current',current)},[current]);
+ useEffect(()=>{try{localStorage.setItem('almox-theme',dark?'dark':'light')}catch{}},[dark]);
+ useEffect(()=>{try{localStorage.setItem('almox-lists',JSON.stringify(lists))}catch{}},[lists]);
+ useEffect(()=>{try{localStorage.setItem('almox-current',current)}catch{}},[current]);
  const active=lists.find(l=>l.id===current);
  const filtered=useMemo(()=>PRODUCTS.filter(p=>p.toLowerCase().includes(search.toLowerCase())),[search]);
- const items=active?.items||{};
- const total=Object.values(items).reduce((s,v)=>s+v.total,0);
- const productTotals=useMemo(()=>Object.values(items).reduce((a,v)=>{a[v.product]=(a[v.product]||0)+v.total;return a},{}),[items]);
- function newList(){const name=listName.trim()||`Lista ${lists.length+1}`; const id=crypto.randomUUID(); setLists(x=>[...x,{id,name,createdAt:new Date().toISOString(),items:{},history:[]}]); setCurrent(id); setListModal(false);setListName('');setView('list')}
- function addQty(value){if(!product||!color||!value||Number(value)<=0)return; const k=keyOf(product,color); const n=Number(value); setLists(ls=>ls.map(l=>l.id!==current?l:{...l,items:{...l.items,[k]:{product,color,total:(l.items[k]?.total||0)+n}},history:[...(l.history||[]),{product,color,qty:n,at:new Date().toISOString()}]})); setQty('');}
+ const items=active?.items&&typeof active.items==='object'?active.items:{};
+ const total=Object.values(items).reduce((s,v)=>s+(Number(v?.total)||0),0);
+ const productTotals=useMemo(()=>Object.values(items).reduce((a,v)=>{if(v?.product)a[v.product]=(a[v.product]||0)+(Number(v.total)||0);return a},{}),[items]);
+ function newList(){const name=listName.trim()||`Lista ${lists.length+1}`; const id=globalThis.crypto?.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`; setLists(x=>[...x,{id,name,createdAt:new Date().toISOString(),items:{},history:[]}]); setCurrent(id); setListModal(false);setListName('');setView('list')}
+ function addQty(value){if(!product||!color||!value||Number(value)<=0)return; const k=keyOf(product,color); const n=Number(value); setLists(ls=>ls.map(l=>l.id!==current?l:{...l,items:{...l.items,[k]:{product,color,total:(Number(l.items?.[k]?.total)||0)+n}},history:[...(l.history||[]),{product,color,qty:n,at:new Date().toISOString()}]})); setQty('');}
  function openCalc(p,c){setProduct(p);setColor(c);setQty('');setCalcOpen(true)}
- function csvExport(){ if(!active)return; const rows=[['Lista','Produto','Cor','Quantidade']];Object.values(active.items).forEach(v=>rows.push([active.name,v.product,v.color,v.total])); const blob=new Blob([rows.map(r=>r.join(';')).join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${active.name}.csv`;a.click();URL.revokeObjectURL(a.href)}
+ function csvExport(){ if(!active)return; const rows=[['Lista','Produto','Cor','Quantidade']];Object.values(active.items||{}).forEach(v=>rows.push([active.name,v.product,v.color,v.total])); const blob=new Blob([rows.map(r=>r.join(';')).join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${active.name}.csv`;a.click();URL.revokeObjectURL(a.href)}
  function pdfPrint(){ if(!active)return; window.print() }
  return <div className={dark?'app dark':'app'}>
   <header><div><small>ALMOXARIFADO</small><h1>{active?.name||'Minhas listas'}</h1></div><button className="icon" onClick={()=>setDark(!dark)}>{dark?'☀️':'🌙'}</button></header>
-  {!active ? <main className="home"><div className="hero"><div className="hero-icon">📦</div><h2>Controle de materiais</h2><p>Catálogo por produto e cor, lançamentos acumulados e listas independentes.</p><button className="primary big" onClick={()=>setListModal(true)}>＋ NOVA LISTA</button></div><section><div className="section-title"><h3>Listas salvas</h3><span>{lists.length}</span></div>{lists.map(l=><button key={l.id} className="list-card" onClick={()=>setCurrent(l.id)}><div><strong>{l.name}</strong><small>{Object.keys(l.items).length} combinações · {Object.values(l.items).reduce((s,v)=>s+v.total,0)} unidades</small></div><span>›</span></button>)}</section></main> : <>
+  {!active ? <main className="home"><div className="hero"><div className="hero-icon">📦</div><h2>Controle de materiais</h2><p>Catálogo por produto e cor, lançamentos acumulados e listas independentes.</p><button className="primary big" onClick={()=>setListModal(true)}>＋ NOVA LISTA</button></div><section><div className="section-title"><h3>Listas salvas</h3><span>{lists.length}</span></div>{lists.map(l=><button key={l.id} className="list-card" onClick={()=>setCurrent(l.id)}><div><strong>{l.name}</strong><small>{Object.keys(l.items||{}).length} combinações · {Object.values(l.items||{}).reduce((s,v)=>s+(Number(v.total)||0),0)} unidades</small></div><span>›</span></button>)}</section></main> : <>
    <nav className="tabs"><button className={view==='list'?'active':''} onClick={()=>setView('list')}>📋 Lista</button><button className={view==='summary'?'active':''} onClick={()=>setView('summary')}>📊 Resumo</button><button onClick={()=>setListModal(true)}>＋ Nova</button><button onClick={()=>setCurrent('')}>☰ Listas</button></nav>
    {view==='list' ? <main><div className="stats"><div><span>Total da lista</span><b>{total}</b><em>unidades</em></div><div><span>Produtos</span><b>{Object.keys(productTotals).length}</b><em>tipos</em></div></div>
     <div className="search"><span>🔎</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar produto..."/></div>
@@ -46,6 +53,6 @@ function App(){
   <footer>Almoxarifado · dados salvos neste dispositivo</footer>
  </div>
 }
-function ProductCard({product,items,onAdd}){const rows=Object.values(items).filter(v=>v.product===product);const total=rows.reduce((s,v)=>s+v.total,0);return <div className="product-card"><div className="product-head"><strong>{product}</strong><b>{total}</b></div>{rows.length?rows.map(r=><button className="color-row" key={r.color} onClick={()=>onAdd(product,r.color)}><span><i>●</i>{r.color}</span><b>{r.total}</b><span>＋</span></button>):<button className="empty-row" onClick={()=>onAdd(product,'')}>＋ adicionar cor</button>}</div>}
+function ProductCard({product,items,onAdd}){const rows=Object.values(items).filter(v=>v.product===product);const total=rows.reduce((s,v)=>s+(Number(v.total)||0),0);return <div className="product-card"><div className="product-head"><strong>{product}</strong><b>{total}</b></div>{rows.length?rows.map(r=><button className="color-row" key={r.color} onClick={()=>onAdd(product,r.color)}><span><i>●</i>{r.color}</span><b>{r.total}</b><span>＋</span></button>):<button className="empty-row" onClick={()=>onAdd(product,'')}>＋ adicionar cor</button>}</div>}
 
 createRoot(document.getElementById('root')).render(<App/>);
