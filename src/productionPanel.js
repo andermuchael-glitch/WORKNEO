@@ -1,148 +1,75 @@
 import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js';
 
 const ignored = new Set(EXCLUDED_SEWING_PRODUCTS.map((s) => String(s).trim().toUpperCase()));
-const fmt = (n) => Number.isInteger(Number(n)) ? String(Number(n)) : Number(n).toFixed(2).replace(/\.00$/, '');
-const norm = (s) => String(s || '').trim().toUpperCase();
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-const LABELS = {
-  linhaZigM: 'LINHA — ZIG', linhaRetaM: 'LINHA — RETA', fitaRigida: 'FITA RÍGIDA', elastico: 'ELÁSTICO', vies: 'VIÉS', pompom: 'POMPOM',
-  elasticoRaboDeGato: 'ELÁSTICO RABO DE GATO', cordasPoliester: 'CORDAS POLIÉSTER', elasticoFF: 'ELÁSTICO FF', gorgurao: 'GORGURÃO',
-  poliester: 'POLIESTER', cadarco: 'CADARÇO', mosquetao: 'MOSQUETÃO', fecho: 'FECHO', passador: 'PASSADOR', meiaArgola: 'MEIA ARGOLA',
-  reguladorFocinhoPorco: 'REGULADOR FOCINHO DE PORCO', etiqueta: 'ETIQUETA', velcro: 'VELCRO', borrachaElastico: 'BORRACHA ELÁSTICO', espuma: 'ESPUMA',
-  plasticoTransparente: 'PLÁSTICO TRANSPARENTE', forroTermico: 'FORRO TÉRMICO', forroImpermeavel: 'FORRO IMPERMEÁVEL', plasticoDuro: 'PLÁSTICO DURO',
-  telaBolso: 'TELA DE BOLSO', forroMatelace: 'FORRO MATELACÊ'
-};
 const ASSIGN_KEY = 'workneo-costureiras-relatorio-v1';
+const norm = (s) => String(s || '').trim().toUpperCase();
+const fmt = (n) => Number.isInteger(Number(n)) ? String(Number(n)) : Number(n).toFixed(2).replace(/\.00$/, '');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LABELS = { linhaZigM:'LINHA — ZIG', linhaRetaM:'LINHA — RETA', fitaRigida:'FITA RÍGIDA', elastico:'ELÁSTICO', vies:'VIÉS', pompom:'POMPOM', elasticoRaboDeGato:'ELÁSTICO RABO DE GATO', cordasPoliester:'CORDAS POLIÉSTER', elasticoFF:'ELÁSTICO FF', gorgurao:'GORGURÃO', poliester:'POLIÉSTER', cadarco:'CADARÇO', mosquetao:'MOSQUETÃO', fecho:'FECHO', passador:'PASSADOR', meiaArgola:'MEIA ARGOLA', reguladorFocinhoPorco:'REGULADOR FOCINHO DE PORCO', etiqueta:'ETIQUETA', velcro:'VELCRO', borrachaElastico:'BORRACHA', espuma:'ESPUMA', plasticoTransparente:'PLÁSTICO TRANSPARENTE', forroTermico:'FORRO TÉRMICO', forroImpermeavel:'FORRO IMPERMEÁVEL', plasticoDuro:'PLÁSTICO DURO', telaBolso:'TELA DE BOLSO', forroMatelace:'FORRO MATELACÊ' };
+const MATERIAL_BY_METER = new Set(['fitaRigida','elastico','vies','pompom','elasticoRaboDeGato','cordasPoliester','elasticoFF','gorgurao','poliester','cadarco']);
+const HARDWARE = new Set(['mosquetao','fecho','passador','meiaArgola']);
 
-function activeList() {
-  try {
-    const lists = JSON.parse(localStorage.getItem('almox-lists') || '[]');
-    const id = localStorage.getItem('almox-current') || '';
-    return lists.find((l) => String(l?.id) === String(id)) || null;
-  } catch (_) { return null; }
-}
-function getAssignments() { try { return JSON.parse(localStorage.getItem(ASSIGN_KEY) || '[]'); } catch (_) { return []; } }
-function saveAssignments(items) { localStorage.setItem(ASSIGN_KEY, JSON.stringify(items)); }
-function sourceItems(list) { return Object.values(list?.items || {}).filter((v) => v?.product && !ignored.has(norm(v.product)) && Number(v.total) > 0); }
+function activeList(){try{const lists=JSON.parse(localStorage.getItem('almox-lists')||'[]');const id=localStorage.getItem('almox-current')||'';return lists.find(l=>String(l?.id)===String(id))||null;}catch(_){return null;}}
+function sourceItems(list){return Object.values(list?.items||{}).filter(v=>v?.product&&!ignored.has(norm(v.product))&&Number(v.total)>0);}
+function getAssignments(){try{return JSON.parse(localStorage.getItem(ASSIGN_KEY)||'[]');}catch(_){return[];}}
+function saveAssignments(v){localStorage.setItem(ASSIGN_KEY,JSON.stringify(v));}
 
-function calculateItems(items) {
-  const grouped = new Map(); const missing = new Set();
-  function add(material, spec, color, qty, product, unit = 'UN') {
-    const amount = Number(qty); if (!Number.isFinite(amount) || amount === 0) return;
-    const key = [material, spec || '', color || '', unit].join('|'); let row = grouped.get(key);
-    if (!row) { row = { material, spec: spec || '', color: color || '', qty: 0, unit, products: new Map() }; grouped.set(key, row); }
-    row.qty += amount; row.products.set(product, (row.products.get(product) || 0) + amount);
+function calculateItems(items){
+ const grouped=new Map(),missing=new Set();
+ const add=(material,spec,color,qty,product,unit='UN')=>{const amount=Number(qty);if(!Number.isFinite(amount)||amount===0)return;const key=[material,spec||'',color||'',unit].join('|');let r=grouped.get(key);if(!r){r={material,spec:spec||'',color:color||'',qty:0,unit,products:new Map()};grouped.set(key,r);}r.qty+=amount;r.products.set(product,(r.products.get(product)||0)+amount);};
+ for(const item of items){const sheet=TECHNICAL_SHEETS[item.product],qty=Number(item.total)||0;if(!sheet||!Object.keys(sheet).length){missing.add(item.product);continue;}const productColor=item.color||'SEM COR';
+  if(sheet.linhaZigM!=null)add('LINHA','ZIG','',Number(sheet.linhaZigM)*qty,item.product,'M');
+  if(sheet.linhaRetaM!=null)add('LINHA','RETA','',Number(sheet.linhaRetaM)*qty,item.product,'M');
+  for(const [key,value] of Object.entries(sheet)){
+   if(key==='linhaZigM'||key==='linhaRetaM')continue;
+   if(key.startsWith('ziper')){add('ZÍPER',key.replace('ziper',''),productColor,Number(value)*qty,item.product,'UN');continue;}
+   if(MATERIAL_BY_METER.has(key)){if(value&&value.cmPeca!=null){const spec=value.largura!=null?`LARG. ${fmt(value.largura)} · ${fmt(value.cmPeca)} CM/PEÇA`:`${fmt(value.cmPeca)} CM/PEÇA`;add(LABELS[key]||key.toUpperCase(),spec,productColor,(Number(value.cmPeca)*qty)/100,item.product,'M');}continue;}
+   if(HARDWARE.has(key)){for(const [componentColor,count] of Object.entries(value||{}))add(LABELS[key],'',componentColor,Number(count)*qty,item.product,'UN');continue;}
+   if(key==='etiqueta'){add('ETIQUETA','1 UN/PEÇA','',Number(value)*qty,item.product,'UN');continue;}
+   add(LABELS[key]||key.toUpperCase(),'UN/PEÇA',productColor,Number(value)*qty,item.product,'UN');
   }
-  for (const item of items) {
-    const sheet = TECHNICAL_SHEETS[item.product]; const qty = Number(item.total) || 0;
-    if (!sheet || Object.keys(sheet).length === 0) { missing.add(item.product); continue; }
-    const productColor = item.color || 'SEM COR';
-    if (sheet.linhaZigM != null) add('LINHA', 'ZIG', '', Number(sheet.linhaZigM) * qty, item.product, 'M');
-    if (sheet.linhaRetaM != null) add('LINHA', 'RETA', '', Number(sheet.linhaRetaM) * qty, item.product, 'M');
-    for (const [key, value] of Object.entries(sheet)) {
-      if (key === 'linhaZigM' || key === 'linhaRetaM') continue;
-      if (key.startsWith('ziper')) { add('ZÍPER', key.replace('ziper', ''), productColor, Number(value) * qty, item.product, 'UN'); continue; }
-      if (['fitaRigida','elastico','vies','pompom','elasticoRaboDeGato','cordasPoliester','elasticoFF','gorgurao','poliester','cadarco'].includes(key)) {
-        if (value && value.cmPeca != null) {
-          const spec = value.largura != null ? `LARG. ${fmt(value.largura)} · ${fmt(value.cmPeca)} CM/PEÇA` : `${fmt(value.cmPeca)} CM/PEÇA`;
-          add(LABELS[key] || key.toUpperCase(), spec, productColor, (Number(value.cmPeca) * qty) / 100, item.product, 'M');
-        }
-        continue;
-      }
-      if (['mosquetao','fecho','passador','meiaArgola'].includes(key)) { for (const [componentColor, count] of Object.entries(value || {})) add(LABELS[key], '', componentColor, Number(count) * qty, item.product, 'UN'); continue; }
-      if (key === 'etiqueta') { add('ETIQUETA', '1 UN/PEÇA', '', Number(value) * qty, item.product, 'UN'); continue; }
-      add(LABELS[key] || key.toUpperCase(), key === 'velcro' || key === 'espuma' ? 'CM/PEÇA' : 'UN/PEÇA', productColor, Number(value) * qty, item.product, 'UN');
-    }
-  }
-  const rows = [...grouped.values()].sort((a, b) => `${a.material}|${a.spec}|${a.color}`.localeCompare(`${b.material}|${b.spec}|${b.color}`));
-  return { rows, missing: [...missing], items };
+ }
+ return{rows:[...grouped.values()].sort((a,b)=>`${a.material}|${a.spec}|${a.color}`.localeCompare(`${b.material}|${b.spec}|${b.color}`)),missing:[...missing],items};
 }
-function calculate(list) { return calculateItems(sourceItems(list)); }
+function calculate(list){return calculateItems(sourceItems(list));}
 
-function addStyle() {
-  if (document.getElementById('production-style')) return;
-  const style = document.createElement('style'); style.id = 'production-style';
-  style.textContent = `
-    #production-launch{position:fixed;right:16px;bottom:18px;z-index:9990;border:0;border-radius:16px;padding:13px 17px;background:#1769e0;color:#fff;font-weight:800;box-shadow:0 8px 25px #0003;cursor:pointer}
-    #production-overlay{display:none;position:fixed;inset:0;z-index:10000;background:#0008;overflow:auto;padding:18px;box-sizing:border-box}
-    #production-panel{max-width:1100px;margin:0 auto;background:#fff;color:#172033;border-radius:22px;min-height:calc(100vh - 36px);box-shadow:0 20px 60px #0005;overflow:hidden}
-    .prod-head{padding:20px 22px;border-bottom:1px solid #e7ebf1;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#fff;z-index:2}
-    .prod-head small{color:#667085;font-weight:800}.prod-head h2{margin:3px 0 0;font-size:24px}.prod-close{border:0;background:#eef2f7;border-radius:12px;font-size:22px;width:42px;height:42px}
-    .prod-tabs{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid #e7ebf1;overflow:auto}.prod-tab{border:0;background:#eef2f7;border-radius:12px;padding:11px 15px;font-weight:800;white-space:nowrap}.prod-tab.active{background:#1769e0;color:#fff}
-    .prod-body{padding:18px}.prod-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px}.prod-action{border:0;border-radius:12px;padding:12px 15px;font-weight:800;background:#1769e0;color:#fff}.prod-secondary{background:#eef2f7;color:#172033}.prod-success{background:#14804a;color:#fff}.prod-danger{background:#d92d20;color:#fff}
-    .prod-card{border:1px solid #e2e7ef;border-radius:16px;margin:10px 0;overflow:hidden}.prod-card h3{margin:0;padding:14px 15px;background:#f8fafc;font-size:15px}
-    .prod-table{width:100%;border-collapse:collapse}.prod-table th,.prod-table td{text-align:left;padding:10px 12px;border-top:1px solid #edf0f4;font-size:13px}.prod-table th{font-size:12px;color:#667085}.prod-table td:last-child,.prod-table th:last-child{text-align:right}
-    .prod-note{padding:12px 14px;background:#fff7e6;border:1px solid #f0d59b;border-radius:12px;margin:10px 0;color:#6b4d00}.prod-empty{padding:30px;text-align:center;color:#667085}.prod-product{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #edf0f4}
-    .prod-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.prod-stat{padding:15px;border:1px solid #e2e7ef;border-radius:16px;background:#f8fafc}.prod-stat span{display:block;color:#667085;font-size:13px}.prod-stat b{display:block;font-size:25px;margin-top:3px}
-    .prod-qty{width:110px;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:10px;padding:10px;font-size:14px}.prod-name{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:10px;padding:10px;font-size:14px}.prod-send-row{display:grid;grid-template-columns:minmax(150px,1fr) 110px minmax(130px,1fr) 170px;gap:8px;align-items:center;padding:12px;border-top:1px solid #edf0f4}.prod-send-title{font-weight:800}.prod-send-sub{font-size:12px;color:#667085;margin-top:3px}.prod-assignment{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #edf0f4}.prod-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2f7;font-size:11px;font-weight:800}.prod-print-title{display:none}
-    @media(max-width:700px){.prod-stats{grid-template-columns:1fr 1fr}.prod-body{padding:12px}.prod-head{padding:15px}.prod-table th,.prod-table td{padding:8px;font-size:12px}.prod-send-row{grid-template-columns:1fr 100px}.prod-send-row .prod-send-button{grid-column:1/-1}.prod-send-row .prod-name{grid-column:1/-1}}
-    @media print{body>*:not(#production-overlay){display:none!important}#production-overlay{display:block!important;position:static;padding:0;background:#fff}#production-panel{box-shadow:none;border-radius:0;min-height:0;max-width:none}.prod-head,.prod-tabs,.prod-toolbar,.prod-note{display:none!important}.prod-body{padding:0}.prod-print-title{display:block;text-align:center;margin-bottom:16px}.prod-card{break-inside:avoid}}
-  `; document.head.appendChild(style);
+function addStyle(){if(document.getElementById('production-style'))return;const style=document.createElement('style');style.id='production-style';style.textContent=`
+#production-launch{position:fixed;right:16px;bottom:18px;z-index:9990;border:0;border-radius:16px;padding:13px 17px;background:#1769e0;color:#fff;font-weight:800;box-shadow:0 8px 25px #0003;cursor:pointer}
+#production-overlay{display:none;position:fixed;inset:0;z-index:10000;background:#0008;overflow:auto;padding:18px;box-sizing:border-box}
+#production-panel{max-width:1100px;margin:0 auto;background:#fff;color:#172033;border-radius:22px;min-height:calc(100vh - 36px);box-shadow:0 20px 60px #0005;overflow:hidden}
+.prod-head{padding:20px 22px;border-bottom:1px solid #e7ebf1;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#fff;z-index:2}.prod-head small{color:#667085;font-weight:800}.prod-head h2{margin:3px 0 0;font-size:24px}.prod-close{border:0;background:#eef2f7;border-radius:12px;font-size:22px;width:42px;height:42px}
+.prod-tabs{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid #e7ebf1;overflow:auto}.prod-tab{border:0;background:#eef2f7;border-radius:12px;padding:11px 15px;font-weight:800;white-space:nowrap}.prod-tab.active{background:#1769e0;color:#fff}.prod-body{padding:18px}.prod-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px}.prod-action{border:0;border-radius:12px;padding:12px 15px;font-weight:800;background:#1769e0;color:#fff}.prod-secondary{background:#eef2f7;color:#172033}.prod-success{background:#14804a;color:#fff}.prod-danger{background:#d92d20;color:#fff}
+.prod-card{border:1px solid #e2e7ef;border-radius:16px;margin:10px 0;overflow:hidden}.prod-card h3{margin:0;padding:14px 15px;background:#f8fafc;font-size:15px}.prod-table{width:100%;border-collapse:collapse}.prod-table th,.prod-table td{text-align:left;padding:10px 12px;border-top:1px solid #edf0f4;font-size:13px}.prod-table th{font-size:12px;color:#667085}.prod-table td:last-child,.prod-table th:last-child{text-align:right}.prod-note{padding:12px 14px;background:#fff7e6;border:1px solid #f0d59b;border-radius:12px;margin:10px 0;color:#6b4d00}.prod-empty{padding:30px;text-align:center;color:#667085}.prod-product{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #edf0f4}.prod-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.prod-stat{padding:15px;border:1px solid #e2e7ef;border-radius:16px;background:#f8fafc}.prod-stat span{display:block;color:#667085;font-size:13px}.prod-stat b{display:block;font-size:25px;margin-top:3px}.prod-qty{width:110px;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:10px;padding:10px;font-size:14px}.prod-name{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:10px;padding:10px;font-size:14px}.prod-send-row{display:grid;grid-template-columns:minmax(150px,1fr) 110px minmax(130px,1fr) 170px;gap:8px;align-items:center;padding:12px;border-top:1px solid #edf0f4}.prod-send-title{font-weight:800}.prod-send-sub{font-size:12px;color:#667085;margin-top:3px}.prod-assignment{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #edf0f4}.prod-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2f7;font-size:11px;font-weight:800}
+.report-filter{display:flex;gap:8px;align-items:center;margin-bottom:8px}.report-filter label{font-weight:800}.report-select{border:1px solid #bfc7d4;border-radius:8px;padding:7px 9px;font-weight:700;background:#fff}.report-onepage{font-size:10px}.report-onepage .report-title{display:flex;justify-content:space-between;align-items:end;border-bottom:2px solid #172033;padding-bottom:5px;margin-bottom:7px}.report-onepage h1{font-size:18px;margin:0}.report-onepage .meta{font-size:10px}.report-onepage table{width:100%;border-collapse:collapse;margin-bottom:7px}.report-onepage th,.report-onepage td{border:1px solid #8d96a3;padding:3px 4px;line-height:1.05}.report-onepage th{font-weight:800}.report-onepage .section-head{font-size:11px;font-weight:900;padding:4px 5px;background:#eef2f7;border:1px solid #8d96a3;border-bottom:0}.report-onepage .material-table th:not(:first-child),.report-onepage .material-table td:not(:first-child){text-align:right}.report-onepage .material-table th:first-child,.report-onepage .material-table td:first-child{width:28%}.report-onepage .product-table th:nth-child(2),.report-onepage .product-table td:nth-child(2){text-align:right;width:12%}.report-onepage .product-table th:nth-child(3),.report-onepage .product-table td:nth-child(3){width:16%}.report-onepage .hardware-table th:last-child,.report-onepage .hardware-table td:last-child{text-align:right}.report-onepage .report-foot{font-size:9px;margin-top:5px}.report-onepage .warn{padding:4px 6px;border:1px solid #c99b35;background:#fff7e6;margin-top:5px}
+@media(max-width:700px){.prod-stats{grid-template-columns:1fr 1fr}.prod-body{padding:12px}.prod-head{padding:15px}.prod-table th,.prod-table td{padding:8px;font-size:12px}.prod-send-row{grid-template-columns:1fr 100px}.prod-send-row .prod-send-button{grid-column:1/-1}.prod-send-row .prod-name{grid-column:1/-1}.report-filter{flex-wrap:wrap}}
+@media print{@page{size:A4 portrait;margin:6mm}body>*:not(#production-overlay){display:none!important}#production-overlay{display:block!important;position:static;padding:0;background:#fff}#production-panel{box-shadow:none;border-radius:0;min-height:0;max-width:none}.prod-head,.prod-tabs,.prod-toolbar,.prod-note,.report-filter{display:none!important}.prod-body{padding:0}.report-onepage{display:block!important;font-size:8.5px!important;page-break-after:avoid}.report-onepage .report-title{margin-bottom:4px;padding-bottom:3px}.report-onepage h1{font-size:15px}.report-onepage .section-head{font-size:9px;padding:3px}.report-onepage th,.report-onepage td{padding:2px 3px;line-height:1}.report-onepage table{margin-bottom:4px}.report-onepage .report-foot{font-size:8px}.report-onepage .warn{padding:3px}}
+`;document.head.appendChild(style);}
+
+function materialMatrix(rows){const colors=[...new Set(rows.filter(r=>r.color).map(r=>r.color))].sort((a,b)=>a.localeCompare(b));const groups=new Map();for(const r of rows){const key=`${r.material}|${r.spec}|${r.unit}`;if(!groups.has(key))groups.set(key,{material:r.material,spec:r.spec,unit:r.unit,colors:new Map(),total:0});const g=groups.get(key);if(r.color)g.colors.set(r.color,(g.colors.get(r.color)||0)+r.qty);else g.total+=r.qty;}return{colors,groups:[...groups.values()]};}
+
+function renderCostureiraReport(panel,list){
+ const assignments=getAssignments();const names=[...new Set(assignments.map(a=>a.costureira).filter(Boolean))].sort((a,b)=>a.localeCompare(b));const current=panel.dataset.reportCostureira||'TODAS';const selected=names.includes(current)?current:'TODAS';panel.dataset.reportCostureira=selected;const filtered=selected==='TODAS'?assignments:assignments.filter(a=>a.costureira===selected);const material=calculateItems(filtered.map(a=>({product:a.product,color:a.color,total:a.qty})));const matrix=materialMatrix(material.rows);
+ let html=`<div class="report-filter"><label>COSTUREIRA:</label><select class="report-select" id="report-seamstress"><option value="TODAS" ${selected==='TODAS'?'selected':''}>TODAS</option>${names.map(n=>`<option value="${esc(n)}" ${n===selected?'selected':''}>${esc(n)}</option>`).join('')}</select><button class="prod-action" id="prod-print">🖨️ IMPRIMIR 1 PÁGINA</button></div>`;
+ html+=`<div class="report-onepage"><div class="report-title"><div><h1>RELATÓRIO DE MATERIAIS</h1><div class="meta">Costureira: <b>${esc(selected==='TODAS'?'TODAS AS COSTUREIRAS':selected)}</b></div></div><div class="meta">Data da separação: ${new Date().toLocaleDateString('pt-BR')}</div></div>`;
+ html+=`<div class="section-head">PRODUTOS PARA COSTURA</div><table class="product-table"><thead><tr><th>PRODUTO</th><th>QUANTIDADE</th><th>COR</th><th>ACABAMENTO</th></tr></thead><tbody>`;
+ if(!filtered.length)html+='<tr><td colspan="4">Nenhum produto enviado para relatório.</td></tr>';else filtered.forEach(a=>html+=`<tr><td>${esc(a.product)}</td><td>${fmt(a.qty)}</td><td>${esc(a.color||'')}</td><td></td></tr>`);html+='</tbody></table>';
+ html+=`<div class="section-head">MATERIAIS POR COR</div><table class="material-table"><thead><tr><th>MATERIAL</th>${matrix.colors.map(c=>`<th>${esc(c)}</th>`).join('')}<th>TOTAL</th></tr></thead><tbody>`;
+ if(!matrix.groups.length)html+=`<tr><td colspan="${matrix.colors.length+2}">Nenhum material calculado.</td></tr>`;matrix.groups.forEach(g=>html+=`<tr><td>${esc(g.material)}${g.spec?` — ${esc(g.spec)}`:''} <small>(${g.unit})</small></td>${matrix.colors.map(c=>`<td>${g.colors.has(c)?fmt(g.colors.get(c)):'—'}</td>`).join('')}<td class="color-total">${g.total?fmt(g.total):'—'}</td></tr>`);html+='</tbody></table>';
+ const hardware=material.rows.filter(r=>['MOSQUETÃO','FECHO','PASSADOR','MEIA ARGOLA'].includes(r.material));if(hardware.length)html+=`<div class="section-head">FERRAGENS E REGULADOR</div><table class="hardware-table"><thead><tr><th>MATERIAL</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>${hardware.map(r=>`<tr><td>${esc(r.material)}</td><td>${esc(r.color||'')}</td><td>${fmt(r.qty)} ${r.unit}</td></tr>`).join('')}</tbody></table>`;
+ const general=material.rows.filter(r=>!r.color);if(general.length)html+=`<div class="section-head">MATERIAIS SEM COR</div><table class="hardware-table"><thead><tr><th>MATERIAL</th><th>TOTAL</th></tr></thead><tbody>${general.map(r=>`<tr><td>${esc(r.material)}${r.spec?` — ${esc(r.spec)}`:''}</td><td>${fmt(r.qty)} ${r.unit}</td></tr>`).join('')}</tbody></table>`;
+ if(material.missing.length)html+=`<div class="warn"><b>FICHAS TÉCNICAS INCOMPLETAS:</b> ${material.missing.map(esc).join(', ')}. O sistema não inventou consumo.</div>`;html+=`<div class="report-foot">WORKNEO · Este relatório é uma distribuição para costura e não altera os dados da Aba 1.</div></div>`;panel.querySelector('.prod-body').innerHTML=html;
+ const sel=panel.querySelector('#report-seamstress');if(sel)sel.onchange=()=>{panel.dataset.reportCostureira=sel.value;render('relatorio-costureiras');};const print=panel.querySelector('#prod-print');if(print)print.onclick=()=>window.print();
 }
 
-function render(tab) {
-  const overlay = document.getElementById('production-overlay'); if (!overlay) return;
-  const panel = document.getElementById('production-panel'); const list = activeList(); const result = calculate(list);
-  const products = new Map(); result.items.forEach((item) => products.set(item.product, (products.get(item.product) || 0) + Number(item.total || 0)));
-  const total = result.items.reduce((sum, item) => sum + Number(item.total || 0), 0); const displayQty = (row) => `${fmt(row.qty)} ${row.unit}`; let html = '';
-
-  if (tab === 'producao') {
-    html += `<div class="prod-stats"><div class="prod-stat"><span>LISTA</span><b>${esc(list?.name || 'Nenhuma')}</b></div><div class="prod-stat"><span>UNIDADES</span><b>${fmt(total)}</b></div><div class="prod-stat"><span>PRODUTOS</span><b>${products.size}</b></div></div>`;
-    html += `<div class="prod-card"><h3>ITENS ENVIADOS PARA PRODUÇÃO</h3><div style="padding:10px 15px">`;
-    if (products.size) [...products].sort().forEach(([name, qty]) => { html += `<div class="prod-product"><span>${esc(name)}</span><b>${fmt(qty)}</b></div>`; }); else html += '<div class="prod-empty">A Aba 1 ainda não possui itens nesta lista.</div>';
-    html += '</div></div>';
-  } else if (tab === 'relatorio') {
-    html += `<div class="prod-print-title"><h1>RELATÓRIO DE SEPARAÇÃO DE MATERIAIS</h1><div>${esc(list?.name || 'Lista')} · ${new Date().toLocaleDateString('pt-BR')}</div></div><div class="prod-toolbar"><button class="prod-action" id="prod-print">🖨️ IMPRIMIR</button><button class="prod-action prod-secondary" id="prod-refresh">↻ ATUALIZAR</button></div>`;
-    if (!result.rows.length) html += '<div class="prod-empty">Não há consumo calculado para esta lista.</div>';
-    result.rows.forEach((row) => { html += `<div class="prod-card"><h3>${esc(row.material)}${row.spec ? ` — ${esc(row.spec)}` : ''}${row.color ? ` · ${esc(row.color)}` : ''}</h3><table class="prod-table"><thead><tr><th>PRODUTO</th><th>QTD.</th></tr></thead><tbody>`; [...row.products].sort().forEach(([product, qty]) => { html += `<tr><td>${esc(product)}</td><td>${fmt(qty)} ${row.unit}</td></tr>`; }); html += `<tr><th>TOTAL</th><th>${displayQty(row)}</th></tr></tbody></table></div>`; });
-  } else if (tab === 'costureiras') {
-    const assignments = getAssignments();
-    html += `<div class="prod-note"><b>SEPARAÇÃO POR COSTUREIRA:</b> escolha a quantidade de cada produto/cor, digite a costureira e toque em <b>ENVIAR PARA RELATÓRIO</b>. Você pode enviar o mesmo produto para costureiras diferentes em quantidades diferentes.</div>`;
-    html += `<div class="prod-toolbar"><button class="prod-action prod-success" id="send-report-view">📑 VER RELATÓRIO ENVIADO</button><button class="prod-action prod-secondary" id="clear-assignments">🗑️ LIMPAR ENVIADOS</button></div>`;
-    const items = sourceItems(list);
-    if (!items.length) html += '<div class="prod-empty">Nenhum produto disponível na Aba 1.</div>';
-    else {
-      html += '<div class="prod-card"><h3>PRODUTOS DA ABA 1 — ESCOLHA O QUE VAI PARA CADA COSTUREIRA</h3>';
-      items.forEach((item, index) => { html += `<div class="prod-send-row"><div><div class="prod-send-title">${esc(item.product)}</div><div class="prod-send-sub">COR: ${esc(item.color || 'SEM COR')} · DISPONÍVEL: ${fmt(item.total)}</div></div><input class="prod-qty" id="qty-${index}" type="number" min="1" max="${Number(item.total)}" value="${Number(item.total)}"><input class="prod-name" id="seamstress-${index}" list="costureira-list" placeholder="Nome da costureira"><button class="prod-action prod-success prod-send-button" data-send-index="${index}">➜ ENVIAR PARA RELATÓRIO</button></div>`; });
-      html += '</div><datalist id="costureira-list"></datalist>';
-    }
-    if (assignments.length) { html += '<div class="prod-card"><h3>ITENS JÁ ENVIADOS</h3><div style="padding:10px 15px">'; assignments.forEach((a, i) => { html += `<div class="prod-assignment"><div><b>${esc(a.product)}</b> · ${esc(a.color || 'SEM COR')}<br><span class="prod-badge">${esc(a.costureira)}</span> <span class="prod-badge">${fmt(a.qty)} UN</span></div><button class="prod-action prod-danger" data-remove-assignment="${i}">REMOVER</button></div>`; }); html += '</div></div>'; }
-  } else if (tab === 'relatorio-costureiras') {
-    const assignments = getAssignments(); const bySeamstress = new Map(); assignments.forEach((a) => { const key = a.costureira || 'SEM COSTUREIRA'; if (!bySeamstress.has(key)) bySeamstress.set(key, []); bySeamstress.get(key).push(a); });
-    html += `<div class="prod-print-title"><h1>RELATÓRIO DE PRODUÇÃO POR COSTUREIRA</h1><div>${esc(list?.name || 'Lista')} · ${new Date().toLocaleDateString('pt-BR')}</div></div><div class="prod-toolbar"><button class="prod-action" id="prod-print">🖨️ IMPRIMIR</button><button class="prod-action prod-secondary" id="prod-refresh">↻ ATUALIZAR</button></div>`;
-    if (!assignments.length) html += '<div class="prod-empty">Nenhum item foi enviado para uma costureira ainda.</div>';
-    [...bySeamstress.entries()].sort().forEach(([name, rows]) => { html += `<div class="prod-card"><h3>👩‍🔧 COSTUREIRA: ${esc(name)}</h3><table class="prod-table"><thead><tr><th>PRODUTO</th><th>COR</th><th>QTD.</th></tr></thead><tbody>`; rows.forEach((a) => { html += `<tr><td>${esc(a.product)}</td><td>${esc(a.color || 'SEM COR')}</td><td><b>${fmt(a.qty)} UN</b></td></tr>`; }); html += `<tr><th colspan="2">TOTAL DE PEÇAS</th><th>${fmt(rows.reduce((s, a) => s + Number(a.qty || 0), 0))} UN</th></tr></tbody></table></div>`; });
-    if (assignments.length) { const materialResult = calculateItems(assignments.map((a) => ({ product: a.product, color: a.color, total: a.qty }))); html += '<div class="prod-card"><h3>📦 MATERIAIS DAS PEÇAS ENVIADAS</h3><table class="prod-table"><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>'; materialResult.rows.forEach((r) => { html += `<tr><td>${esc(r.material)}</td><td>${esc(r.spec || '—')}</td><td>${esc(r.color || 'GERAL')}</td><td><b>${fmt(r.qty)} ${r.unit}</b></td></tr>`; }); html += '</tbody></table></div>'; if (materialResult.missing.length) html += `<div class="prod-note"><b>FICHAS INCOMPLETAS:</b> ${materialResult.missing.map(esc).join(', ')}</div>`; }
-  } else {
-    // MATERIAIS: visão anterior preservada.
-    html += `<div class="prod-toolbar"><button class="prod-action" id="prod-report">📄 VER RELATÓRIO COMPLETO</button><button class="prod-action prod-secondary" id="prod-refresh">↻ ATUALIZAR</button></div>`;
-    if (result.missing.length) html += `<div class="prod-note"><b>ATENÇÃO:</b> ${result.missing.map(esc).join(', ')} não possui ficha técnica completa. O sistema não inventará consumo.</div>`;
-    if (!result.rows.length) html += '<div class="prod-empty">Nenhum material calculado. Lance itens na Aba 1 para gerar o consumo.</div>'; else { html += '<div class="prod-card"><h3>RESUMO AGRUPADO — MATERIAL × ESPECIFICAÇÃO × COR</h3><table class="prod-table"><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>'; result.rows.forEach((row) => { html += `<tr><td>${esc(row.material)}</td><td>${esc(row.spec || '—')}</td><td>${esc(row.color || 'GERAL')}</td><td><b>${displayQty(row)}</b></td></tr>`; }); html += '</tbody></table></div>'; }
-  }
-
-  panel.querySelector('.prod-body').innerHTML = html;
-  panel.querySelectorAll('.prod-tab').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab));
-  const refresh = panel.querySelector('#prod-refresh'); if (refresh) refresh.onclick = () => render(tab);
-  const report = panel.querySelector('#prod-report'); if (report) report.onclick = () => render('relatorio');
-  const print = panel.querySelector('#prod-print'); if (print) print.onclick = () => window.print();
-  const seamReport = panel.querySelector('#send-report-view'); if (seamReport) seamReport.onclick = () => render('relatorio-costureiras');
-  const clear = panel.querySelector('#clear-assignments'); if (clear) clear.onclick = () => { if (confirm('Limpar todos os itens enviados para o relatório das costureiras?')) { saveAssignments([]); render('costureiras'); } };
-  panel.querySelectorAll('[data-send-index]').forEach((button) => button.onclick = () => {
-    const index = Number(button.dataset.sendIndex); const item = sourceItems(list)[index]; const qty = Number(panel.querySelector(`#qty-${index}`)?.value || 0); const costureira = String(panel.querySelector(`#seamstress-${index}`)?.value || '').trim();
-    if (!item || !costureira || !Number.isFinite(qty) || qty <= 0) { alert('Informe a costureira e uma quantidade válida.'); return; }
-    if (qty > Number(item.total)) { alert('A quantidade não pode ser maior que a disponível na Aba 1.'); return; }
-    const assignments = getAssignments(); assignments.push({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, product: item.product, color: item.color || '', qty, costureira, listId: list?.id || '', listName: list?.name || '', createdAt: new Date().toISOString() }); saveAssignments(assignments); render('costureiras');
-  });
-  panel.querySelectorAll('[data-remove-assignment]').forEach((button) => button.onclick = () => { const index = Number(button.dataset.removeAssignment); const assignments = getAssignments(); assignments.splice(index, 1); saveAssignments(assignments); render('costureiras'); });
+function render(tab){const overlay=document.getElementById('production-overlay');if(!overlay)return;const panel=document.getElementById('production-panel');const list=activeList();const result=calculate(list);let html='';
+ if(tab==='producao'){const products=new Map();result.items.forEach(i=>products.set(i.product,(products.get(i.product)||0)+Number(i.total||0)));const total=result.items.reduce((s,i)=>s+Number(i.total||0),0);html=`<div class="prod-stats"><div class="prod-stat"><span>LISTA</span><b>${esc(list?.name||'Nenhuma')}</b></div><div class="prod-stat"><span>UNIDADES</span><b>${fmt(total)}</b></div><div class="prod-stat"><span>PRODUTOS</span><b>${products.size}</b></div></div><div class="prod-card"><h3>ITENS DA ABA 1</h3><div style="padding:10px 15px">${products.size?[...products].sort().map(([n,q])=>`<div class="prod-product"><span>${esc(n)}</span><b>${fmt(q)}</b></div>`).join(''):'<div class="prod-empty">A Aba 1 ainda não possui itens.</div>'}</div></div>`;}
+ else if(tab==='relatorio'){html=`<div class="prod-toolbar"><button class="prod-action" id="prod-print">🖨️ IMPRIMIR</button><button class="prod-action prod-secondary" id="prod-refresh">↻ ATUALIZAR</button></div>`;if(!result.rows.length)html+='<div class="prod-empty">Não há consumo calculado.</div>';else{html+='<div class="prod-card"><h3>RESUMO AGRUPADO — MATERIAL × ESPECIFICAÇÃO × COR</h3><table class="prod-table"><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>';result.rows.forEach(r=>html+=`<tr><td>${esc(r.material)}</td><td>${esc(r.spec||'—')}</td><td>${esc(r.color||'GERAL')}</td><td><b>${fmt(r.qty)} ${r.unit}</b></td></tr>`);html+='</tbody></table></div>';}}
+ else if(tab==='costureiras'){const assignments=getAssignments(),items=sourceItems(list);html=`<div class="prod-note"><b>SEPARAÇÃO POR COSTUREIRA:</b> escolha quantidade, informe a costureira e envie para o relatório. A Aba 1 permanece intacta.</div><div class="prod-toolbar"><button class="prod-action prod-success" id="send-report-view">📑 VER RELATÓRIO 1 PÁGINA</button><button class="prod-action prod-secondary" id="clear-assignments">🗑️ LIMPAR ENVIADOS</button></div>`;if(!items.length)html+='<div class="prod-empty">Nenhum produto disponível na Aba 1.</div>';else{html+='<div class="prod-card"><h3>PRODUTOS DA ABA 1</h3>';items.forEach((item,i)=>html+=`<div class="prod-send-row"><div><div class="prod-send-title">${esc(item.product)}</div><div class="prod-send-sub">COR: ${esc(item.color||'SEM COR')} · DISPONÍVEL: ${fmt(item.total)}</div></div><input class="prod-qty" id="qty-${i}" type="number" min="1" max="${Number(item.total)}" value="${Number(item.total)}"><input class="prod-name" id="seamstress-${i}" list="costureira-list" placeholder="Nome da costureira"><button class="prod-action prod-success prod-send-button" data-send-index="${i}">➜ ENVIAR</button></div>`);html+='</div><datalist id="costureira-list"></datalist>';if(assignments.length){html+='<div class="prod-card"><h3>ITENS JÁ ENVIADOS</h3><div style="padding:10px 15px">';assignments.forEach((a,i)=>html+=`<div class="prod-assignment"><div><b>${esc(a.product)}</b> · ${esc(a.color||'SEM COR')}<br><span class="prod-badge">${esc(a.costureira)}</span> <span class="prod-badge">${fmt(a.qty)} UN</span></div><button class="prod-action prod-danger" data-remove-assignment="${i}">REMOVER</button></div>`);html+='</div></div>';}}
+ else if(tab==='relatorio-costureiras'){renderCostureiraReport(panel,list);return;}
+ else {html=`<div class="prod-toolbar"><button class="prod-action" id="prod-report">📄 VER RELATÓRIO COMPLETO</button><button class="prod-action prod-secondary" id="prod-refresh">↻ ATUALIZAR</button></div>`;if(result.missing.length)html+=`<div class="prod-note"><b>ATENÇÃO:</b> ${result.missing.map(esc).join(', ')} não possui ficha técnica completa.</div>`;if(!result.rows.length)html+='<div class="prod-empty">Nenhum material calculado. Lance itens na Aba 1.</div>';else{html+='<div class="prod-card"><h3>RESUMO AGRUPADO — MATERIAL × ESPECIFICAÇÃO × COR</h3><table class="prod-table"><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>';result.rows.forEach(r=>html+=`<tr><td>${esc(r.material)}</td><td>${esc(r.spec||'—')}</td><td>${esc(r.color||'GERAL')}</td><td><b>${fmt(r.qty)} ${r.unit}</b></td></tr>`);html+='</tbody></table></div>';}}
+ panel.querySelector('.prod-body').innerHTML=html;panel.querySelectorAll('.prod-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));const refresh=panel.querySelector('#prod-refresh');if(refresh)refresh.onclick=()=>render(tab);const report=panel.querySelector('#prod-report');if(report)report.onclick=()=>render('relatorio');const print=panel.querySelector('#prod-print');if(print)print.onclick=()=>window.print();const seam=panel.querySelector('#send-report-view');if(seam)seam.onclick=()=>render('relatorio-costureiras');const clear=panel.querySelector('#clear-assignments');if(clear)clear.onclick=()=>{if(confirm('Limpar todos os itens enviados?')){saveAssignments([]);render('costureiras');}};
+ panel.querySelectorAll('[data-send-index]').forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.sendIndex),item=sourceItems(list)[i],qty=Number(panel.querySelector(`#qty-${i}`)?.value||0),costureira=String(panel.querySelector(`#seamstress-${i}`)?.value||'').trim();if(!item||!costureira||!Number.isFinite(qty)||qty<=0){alert('Informe produto, quantidade e costureira.');return;}if(qty>Number(item.total)){alert('A quantidade não pode ser maior que a disponível na Aba 1.');return;}const a=getAssignments();a.push({id:`${Date.now()}-${Math.random().toString(16).slice(2)}`,product:item.product,color:item.color||'',qty,costureira,listId:list?.id||'',listName:list?.name||'',createdAt:new Date().toISOString()});saveAssignments(a);render('costureiras');});
+ panel.querySelectorAll('[data-remove-assignment]').forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.removeAssignment),a=getAssignments();a.splice(i,1);saveAssignments(a);render('costureiras');});
 }
-
-function mount() {
-  if (document.getElementById('production-launch')) return; addStyle();
-  const button = document.createElement('button'); button.id = 'production-launch'; button.textContent = '🏭 PRODUÇÃO';
-  button.onclick = () => { const overlay = document.getElementById('production-overlay'); overlay.style.display = 'block'; render('materiais'); }; document.body.appendChild(button);
-  const overlay = document.createElement('div'); overlay.id = 'production-overlay';
-  overlay.innerHTML = `<div id="production-panel"><div class="prod-head"><div><small>WORKNEO · PRODUÇÃO</small><h2>Planejamento e separação de materiais</h2></div><button class="prod-close" id="prod-close">×</button></div><div class="prod-tabs"><button class="prod-tab active" data-tab="materiais">📦 Materiais</button><button class="prod-tab" data-tab="producao">🏭 Produção</button><button class="prod-tab" data-tab="relatorio">📄 Relatório</button><button class="prod-tab" data-tab="costureiras">👩‍🔧 Costureiras</button><button class="prod-tab" data-tab="relatorio-costureiras">📑 Rel. Costura</button></div><div class="prod-body"></div></div>`;
-  document.body.appendChild(overlay); document.getElementById('prod-close').onclick = () => { overlay.style.display = 'none'; }; overlay.addEventListener('click', (event) => { if (event.target === overlay) overlay.style.display = 'none'; }); overlay.querySelectorAll('.prod-tab').forEach((tabButton) => tabButton.onclick = () => render(tabButton.dataset.tab));
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+function mount(){if(document.getElementById('production-launch'))return;addStyle();const button=document.createElement('button');button.id='production-launch';button.textContent='🏭 PRODUÇÃO';button.onclick=()=>{const o=document.getElementById('production-overlay');o.style.display='block';render('materiais');};document.body.appendChild(button);const overlay=document.createElement('div');overlay.id='production-overlay';overlay.innerHTML=`<div id="production-panel"><div class="prod-head"><div><small>WORKNEO · PRODUÇÃO</small><h2>Planejamento e separação de materiais</h2></div><button class="prod-close" id="prod-close">×</button></div><div class="prod-tabs"><button class="prod-tab active" data-tab="materiais">📦 Materiais</button><button class="prod-tab" data-tab="producao">🏭 Produção</button><button class="prod-tab" data-tab="relatorio">📄 Relatório</button><button class="prod-tab" data-tab="costureiras">👩‍🔧 Costureiras</button><button class="prod-tab" data-tab="relatorio-costureiras">📑 Rel. Costura</button></div><div class="prod-body"></div></div>`;document.body.appendChild(overlay);document.getElementById('prod-close').onclick=()=>overlay.style.display='none';overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none';});overlay.querySelectorAll('.prod-tab').forEach(b=>b.onclick=()=>render(b.dataset.tab));}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
