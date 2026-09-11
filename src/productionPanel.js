@@ -29,13 +29,13 @@ function calculate(list) {
   const missing = new Set();
   const items = Object.values(list?.items || {}).filter((v) => v?.product && !ignored.has(norm(v.product)));
 
-  function add(material, spec, color, qty, product) {
+  function add(material, spec, color, qty, product, unit = 'UN') {
     const amount = Number(qty);
     if (!Number.isFinite(amount) || amount === 0) return;
-    const key = [material, spec || '', color || ''].join('|');
+    const key = [material, spec || '', color || '', unit].join('|');
     let row = grouped.get(key);
     if (!row) {
-      row = { material, spec: spec || '', color: color || '', qty: 0, products: new Map() };
+      row = { material, spec: spec || '', color: color || '', qty: 0, unit, products: new Map() };
       grouped.set(key, row);
     }
     row.qty += amount;
@@ -50,29 +50,46 @@ function calculate(list) {
       continue;
     }
     const productColor = item.color || 'SEM COR';
-    if (sheet.linhaZigM != null) add('LINHA', 'ZIG', productColor, Number(sheet.linhaZigM) * qty, item.product);
-    if (sheet.linhaRetaM != null) add('LINHA', 'RETA', productColor, Number(sheet.linhaRetaM) * qty, item.product);
+
+    // A ficha técnica informa linha em metros por peça. Não é separada por cor.
+    if (sheet.linhaZigM != null) add('LINHA', 'ZIG', '', Number(sheet.linhaZigM) * qty, item.product, 'M');
+    if (sheet.linhaRetaM != null) add('LINHA', 'RETA', '', Number(sheet.linhaRetaM) * qty, item.product, 'M');
 
     for (const [key, value] of Object.entries(sheet)) {
       if (key === 'linhaZigM' || key === 'linhaRetaM') continue;
+
       if (key.startsWith('ziper')) {
-        add('ZÍPER', key.replace('ziper', ''), productColor, Number(value) * qty, item.product);
+        add('ZÍPER', key.replace('ziper', ''), productColor, Number(value) * qty, item.product, 'UN');
         continue;
       }
+
+      // A ficha registra estes materiais em cm/peça. O almoxarifado trabalha em metros.
       if (['fitaRigida','elastico','vies','pompom','elasticoRaboDeGato','cordasPoliester','elasticoFF','gorgurao','poliester','cadarco'].includes(key)) {
         if (value && value.cmPeca != null) {
-          const spec = value.largura != null ? `LARG. ${fmt(value.largura)}` : '';
-          add(LABELS[key] || key.toUpperCase(), spec, productColor, Number(value.cmPeca) * qty, item.product);
+          const spec = value.largura != null
+            ? `LARG. ${fmt(value.largura)} · ${fmt(value.cmPeca)} CM/PEÇA`
+            : `${fmt(value.cmPeca)} CM/PEÇA`;
+          const meters = (Number(value.cmPeca) * qty) / 100;
+          add(LABELS[key] || key.toUpperCase(), spec, productColor, meters, item.product, 'M');
         }
         continue;
       }
+
+      // Componentes com cor própria: respeitar exatamente PRETO/NIQUELADO/VERDE da ficha.
       if (['mosquetao','fecho','passador','meiaArgola'].includes(key)) {
         for (const [componentColor, count] of Object.entries(value || {})) {
-          add(LABELS[key], '', componentColor, Number(count) * qty, item.product);
+          add(LABELS[key], '', componentColor, Number(count) * qty, item.product, 'UN');
         }
         continue;
       }
-      add(LABELS[key] || key.toUpperCase(), key === 'velcro' || key === 'espuma' ? 'CM/PEÇA' : 'UN/PEÇA', productColor, Number(value) * qty, item.product);
+
+      // ETIQUETA é única para todos os produtos/cores: 1 unidade por peça.
+      if (key === 'etiqueta') {
+        add('ETIQUETA', '1 UN/PEÇA', '', Number(value) * qty, item.product, 'UN');
+        continue;
+      }
+
+      add(LABELS[key] || key.toUpperCase(), key === 'velcro' || key === 'espuma' ? 'CM/PEÇA' : 'UN/PEÇA', productColor, Number(value) * qty, item.product, 'UN');
     }
   }
 
@@ -112,12 +129,13 @@ function render(tab) {
   const products = new Map();
   result.items.forEach((item) => products.set(item.product, (products.get(item.product) || 0) + Number(item.total || 0)));
   const total = result.items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const displayQty = (row) => `${fmt(row.qty)} ${row.unit}`;
   let html = '';
 
   if (tab === 'producao') {
     html += `<div class="prod-stats"><div class="prod-stat"><span>LISTA</span><b>${list?.name || 'Nenhuma'}</b></div><div class="prod-stat"><span>UNIDADES</span><b>${fmt(total)}</b></div><div class="prod-stat"><span>PRODUTOS</span><b>${products.size}</b></div></div>`;
     html += `<div class="prod-card"><h3>ITENS ENVIADOS PARA PRODUÇÃO</h3><div style="padding:10px 15px">`;
-    if (products.size) [...products].sort().forEach(([name, qty]) => { html += `<div class="prod-product"><span>${name}</span><b>${fmt(qty)}</b></div>`; });
+    if (products.size) [...products].sort().forEach(([name, qty]) => { html += `<div class="prod-product"><span>${name}</span><b>${fmt(qty)}</b></div>`); 
     else html += '<div class="prod-empty">A Aba 1 ainda não possui itens nesta lista.</div>';
     html += '</div></div>';
   } else if (tab === 'relatorio') {
@@ -126,8 +144,8 @@ function render(tab) {
     if (!result.rows.length) html += '<div class="prod-empty">Não há consumo calculado para esta lista.</div>';
     result.rows.forEach((row) => {
       html += `<div class="prod-card"><h3>${row.material}${row.spec ? ` — ${row.spec}` : ''}${row.color ? ` · ${row.color}` : ''}</h3><table class="prod-table"><thead><tr><th>PRODUTO</th><th>QTD.</th></tr></thead><tbody>`;
-      [...row.products].sort().forEach(([product, qty]) => { html += `<tr><td>${product}</td><td>${fmt(qty)}</td></tr>`; });
-      html += `<tr><th>TOTAL</th><th>${fmt(row.qty)}</th></tr></tbody></table></div>`;
+      [...row.products].sort().forEach(([product, qty]) => { html += `<tr><td>${product}</td><td>${fmt(qty)} ${row.unit}</td></tr>`; });
+      html += `<tr><th>TOTAL</th><th>${displayQty(row)}</th></tr></tbody></table></div>`;
     });
   } else {
     html += `<div class="prod-toolbar"><button class="prod-action" id="prod-report">📄 VER RELATÓRIO COMPLETO</button><button class="prod-action prod-secondary" id="prod-refresh">↻ ATUALIZAR</button></div>`;
@@ -135,7 +153,7 @@ function render(tab) {
     if (!result.rows.length) html += '<div class="prod-empty">Nenhum material calculado. Lance itens na Aba 1 para gerar o consumo.</div>';
     else {
       html += '<div class="prod-card"><h3>RESUMO AGRUPADO — MATERIAL × ESPECIFICAÇÃO × COR</h3><table class="prod-table"><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>';
-      result.rows.forEach((row) => { html += `<tr><td>${row.material}</td><td>${row.spec || '—'}</td><td>${row.color || '—'}</td><td><b>${fmt(row.qty)}</b></td></tr>`; });
+      result.rows.forEach((row) => { html += `<tr><td>${row.material}</td><td>${row.spec || '—'}</td><td>${row.color || 'GERAL'}</td><td><b>${displayQty(row)}</b></td></tr>`; });
       html += '</tbody></table></div>';
     }
   }
