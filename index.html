@@ -8,27 +8,58 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <link rel="manifest" href="./manifest.webmanifest?v=17" />
-    <link rel="icon" href="./icon.svg?v=17" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest?v=18" />
+    <link rel="icon" href="./icon.svg?v=18" type="image/svg+xml" />
     <title>Almoxarifado</title>
     <style>body{margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#172033}.boot{min-height:100vh;display:grid;place-items:center;text-align:center}.boot-card{padding:32px}.boot-icon{font-size:52px}.boot h1{margin:10px 0 6px}.boot p{color:#667085}.list-card{position:relative}.list-delete{position:absolute;right:42px;top:50%;transform:translateY(-50%);z-index:5;width:42px;height:42px;border:0;border-radius:12px;background:#3a4352;color:#ff6b6b;font-size:20px;display:grid;place-items:center;cursor:pointer}.list-delete:active{transform:translateY(-50%) scale(.94)}</style>
     <script>
-      if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js?v=17', {scope:'./'}).catch(() => {}); }); }
-      (function(){function addDeleteButtons(){var cards=Array.from(document.querySelectorAll('.list-card')),lists=[];try{lists=JSON.parse(localStorage.getItem('almox-lists')||'[]')}catch(e){}cards.forEach(function(card,index){if(card.querySelector('.list-delete'))return;var list=lists[index];if(!list||!list.id)return;var btn=document.createElement('span');btn.className='list-delete';btn.textContent='🗑️';btn.title='Apagar lista';btn.setAttribute('role','button');btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();try{var a=JSON.parse(localStorage.getItem('almox-lists')||'[]'),t=a.find(function(x){return x&&String(x.id)===String(list.id)});if(!t||!confirm('Apagar a lista "'+(t.name||'Lista')+'?\n\nEssa ação não pode ser desfeita.'))return;localStorage.setItem('almox-lists',JSON.stringify(a.filter(function(x){return !x||String(x.id)!==String(t.id)})));if(String(localStorage.getItem('almox-current')||'')===String(t.id))localStorage.removeItem('almox-current');location.reload()}catch(err){alert('Não foi possível apagar a lista.')}});card.appendChild(btn)})}window.addEventListener('DOMContentLoaded',function(){addDeleteButtons();var root=document.getElementById('root')||document.body;new MutationObserver(addDeleteButtons).observe(root,{childList:true,subtree:true})})})();
-      (function(){window.setTimeout(function(){var root=document.getElementById('root');if(root&&root.querySelector('.boot')){try{navigator.serviceWorker&&navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}).then(function(){return caches&&caches.keys?caches.keys():[]}).then(function(keys){return Promise.all((keys||[]).map(function(k){return caches.delete(k)})).finally(function(){location.replace('./?recovery=17')})}catch(e){location.reload()}}},4000)})();
+      if ('serviceWorker' in navigator) { window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js?v=18', {scope:'./'}).catch(function(){}); }); }
+      (function(){
+        function addDeleteButtons(){
+          var cards=Array.from(document.querySelectorAll('.list-card')),lists=[];
+          try{lists=JSON.parse(localStorage.getItem('almox-lists')||'[]')}catch(e){}
+          cards.forEach(function(card,index){
+            if(card.querySelector('.list-delete'))return;
+            var list=lists[index]; if(!list||!list.id)return;
+            var btn=document.createElement('span'); btn.className='list-delete'; btn.textContent='🗑️'; btn.title='Apagar lista'; btn.setAttribute('role','button');
+            btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();try{var a=JSON.parse(localStorage.getItem('almox-lists')||'[]'),t=a.find(function(x){return x&&String(x.id)===String(list.id)});if(!t||!confirm('Apagar a lista "'+(t.name||'Lista')+'?\n\nEssa ação não pode ser desfeita.'))return;localStorage.setItem('almox-lists',JSON.stringify(a.filter(function(x){return !x||String(x.id)!==String(t.id)})));if(String(localStorage.getItem('almox-current')||'')===String(t.id))localStorage.removeItem('almox-current');location.reload()}catch(err){alert('Não foi possível apagar a lista.')}});
+            card.appendChild(btn);
+          });
+        }
+        window.addEventListener('DOMContentLoaded',function(){
+          addDeleteButtons();
+          var root=document.getElementById('root')||document.body;
+          new MutationObserver(addDeleteButtons).observe(root,{childList:true,subtree:true});
+        });
+      })();
+      (function(){
+        window.setTimeout(function(){
+          var root=document.getElementById('root');
+          if(root&&root.querySelector('.boot')){
+            try{
+              Promise.resolve().then(function(){return navigator.serviceWorker&&navigator.serviceWorker.getRegistrations?navigator.serviceWorker.getRegistrations():[];})
+                .then(function(rs){return Promise.all((rs||[]).map(function(r){return r.unregister();}));})
+                .then(function(){return caches&&caches.keys?caches.keys():[];})
+                .then(function(keys){return Promise.all((keys||[]).map(function(k){return caches.delete(k);}));})
+                .finally(function(){location.replace('./?recovery=18');});
+            }catch(e){location.reload();}
+          }
+        },4000);
+      })();
     </script>
   </head>
   <body>
-    <div id="root"><div class="boot"><div class="boot-card"><div class="boot-icon">📦</div><h1>Almoxarifado</h1><p>Carregando aplicativo...</p></div></div>
-    <script type="module" src="./src/main.jsx?v=20260911-17"></script>
-    <script type="module" src="./src/productionPanel.js?v=20260911-17"></script>
-    <script type="module" src="./src/productionButtonGuard.js?v=20260911-17"></script>
-    <script type="module" src="./src/costureiraSelector.js?v=20260911-17"></script>
-    <script type="module" src="./src/printOrientation.js?v=20260911-17"></script>
-    <script type="module" src="./src/reportHeader.js?v=20260911-17"></script>
-    <script type="module" src="./src/reportOrder.js?v=20260911-17"></script>
-    <script type="module" src="./src/orderNumbers.js?v=20260911-17"></script>
-    <script type="module" src="./src/productionPeriodReport.js?v=20260911-17"></script>
-    <script type="module" src="./src/costureiraIntegrada.js?v=20260911-17"></script>
+    <div id="root"><div class="boot"><div class="boot-card"><div class="boot-icon">📦</div><h1>Almoxarifado</h1><p>Carregando aplicativo...</p></div></div></div>
+    <script type="module" src="./src/main.jsx?v=20260911-18"></script>
+    <script type="module" src="./src/branchRuntime.js?v=20260911-18"></script>
+    <script type="module" src="./src/productionPanel.js?v=20260911-18"></script>
+    <script type="module" src="./src/productionButtonGuard.js?v=20260911-18"></script>
+    <script type="module" src="./src/costureiraSelector.js?v=20260911-18"></script>
+    <script type="module" src="./src/printOrientation.js?v=20260911-18"></script>
+    <script type="module" src="./src/reportHeader.js?v=20260911-18"></script>
+    <script type="module" src="./src/reportOrder.js?v=20260911-18"></script>
+    <script type="module" src="./src/orderNumbers.js?v=20260911-18"></script>
+    <script type="module" src="./src/productionPeriodReport.js?v=20260911-18"></script>
+    <script type="module" src="./src/costureiraIntegrada.js?v=20260911-18"></script>
   </body>
 </html>
