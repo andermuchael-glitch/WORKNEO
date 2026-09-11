@@ -1,4 +1,4 @@
-const CACHE = 'almoxarifado-v5';
+const CACHE = 'almoxarifado-v6';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -14,12 +14,8 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-
-  // Navegação e módulos do app: sempre tentam a versão publicada primeiro.
-  // Isso evita que um atalho instalado fique preso em um index/JS antigo.
   event.respondWith((async () => {
     try {
       const response = await fetch(event.request, { cache: 'no-store' });
