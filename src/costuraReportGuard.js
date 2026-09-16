@@ -1,13 +1,8 @@
 function textOf(el){return String(el?.textContent||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase();}
 function openNewCostura(tab){
+  if(typeof window.workneoOpenCostura==='function'){window.workneoOpenCostura(tab);return true;}
   const b=document.getElementById('cd-send-main');
-  if(b && typeof b.onclick==='function'){
-    if(tab==='enviar'){b.click();return true;}
-    b.click();
-    const run=()=>{const t=document.querySelector(`#costura-dispatch-overlay .cd-tab[data-tab="${tab}"]`);if(t){t.click();return true}return false};
-    if(run())return true;
-    setTimeout(run,0);return true;
-  }
+  if(b){b.click();const run=()=>{const t=document.querySelector(`#costura-dispatch-overlay .cd-tab[data-tab="${tab}"]`);if(t)t.click()};setTimeout(run,0);return true}
   return false;
 }
 function guard(e){
