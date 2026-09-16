@@ -40,7 +40,7 @@
               Promise.resolve().then(function(){return navigator.serviceWorker&&navigator.serviceWorker.getRegistrations?navigator.serviceWorker.getRegistrations():[];})
                 .then(function(rs){return Promise.all((rs||[]).map(function(r){return r.unregister();}));})
                 .then(function(){return caches&&caches.keys?caches.keys():[];})
-                .then(function(keys){return Promise.all((keys||[]).map(function(k){return caches.delete(k);} );})
+                .then(function(keys){return Promise.all((keys||[]).map(function(k){return caches.delete(k);}));})
                 .finally(function(){location.replace('./?recovery=22');});
             }catch(e){location.reload();}
           }
