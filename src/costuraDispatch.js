@@ -28,3 +28,4 @@ function renderReports(o){const lots=readLots(),now=new Date().toISOString().sli
 function mountButton(){if(document.getElementById('cd-send-main'))return;const quick=document.querySelector('.quick');if(!quick)return;const b=document.createElement('button');b.id='cd-send-main';b.className='cd-btn cd-send';b.textContent='➜ ENVIAR PARA COSTURA';b.onclick=()=>{draft=[];openOverlay('enviar')};quick.appendChild(b);const a=document.createElement('button');a.id='cd-archive-main';a.className='cd-btn cd-archive';a.textContent='🗂️ ARQUIVADOS DA COSTURA';a.onclick=()=>openOverlay('arquivados');quick.appendChild(a)}
 function watch(){style();mountButton();new MutationObserver(()=>mountButton()).observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watch);else watch();
+window.workneoOpenCostura=function(tab='enviar'){draft=[];openOverlay(tab)};
