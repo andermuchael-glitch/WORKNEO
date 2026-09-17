@@ -1,7 +1,8 @@
 import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js';
 
-// O relatório da Produção deve representar um envio individual da nova tela Costura.
-// A fonte correta é workneo-costura-lotes-v2, não o relatório legado.
+// O relatório da Produção usa os lotes reais enviados pela nova tela Costura.
+// Quando houver mais de um envio para a mesma costureira, todos os envios são
+// mantidos individualmente para não misturar pedidos, listas ou quantidades.
 (function(){
   const LOTS_KEY='workneo-costura-lotes-v2';
   const ignored=new Set(EXCLUDED_SEWING_PRODUCTS.map(s=>String(s).trim().toUpperCase()));
@@ -38,29 +39,34 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
     for(const r of colorRows){const key=`${r.material}|${r.spec}|${r.unit}`;let g=map.get(key);if(!g){g={material:r.material,spec:r.spec,unit:r.unit,byColor:new Map()};map.set(key,g)}g.byColor.set(r.color,(g.byColor.get(r.color)||0)+r.qty)}
     return {colors,groups:[...map.values()],hardware,general};
   };
-  const latestFor=(lots,selected)=>{
+  const lotsFor=(lots,selected)=>{
     let x=selected&&selected!=='TODAS'?lots.filter(l=>norm(l.costureira)===norm(selected)):lots.slice();
-    x.sort((a,b)=>String(b.createdAt||b.date).localeCompare(String(a.createdAt||a.date)));
-    return x[0]||null;
+    return x.filter(l=>Array.isArray(l.items)&&l.items.some(i=>i&&i.product&&Number(i.qty)>0))
+      .sort((a,b)=>String(a.createdAt||a.date).localeCompare(String(b.createdAt||b.date)));
   };
   function patch(){
     const panel=document.getElementById('production-panel'),report=panel&&panel.querySelector('.report-onepage');if(!report)return;
-    const sel=panel.querySelector('#report-seamstress'),selected=sel?sel.value:'TODAS',lot=latestFor(readLots(),selected);if(!lot)return;
-    const signature=String(lot.id||lot.createdAt||lot.date)+'|'+selected;
-    if(report.dataset.costuraLiveLotId===signature)return;
-    const items=(lot.items||[]).filter(x=>x&&x.product&&Number(x.qty)>0);
+    const sel=panel.querySelector('#report-seamstress'),selected=sel?sel.value:'TODAS',lots=lotsFor(readLots(),selected);if(!lots.length)return;
+    const signature=lots.map(l=>String(l.id||l.createdAt||l.date)).join(',')+'|'+selected;
+    if(report.dataset.costuraLiveLots===signature)return;
+    const items=lots.flatMap(l=>(l.items||[]).filter(x=>x&&x.product&&Number(x.qty)>0).map(x=>({...x,__lot:l})));
     const result=calculateItems(items),mx=buildMatrix(result.rows),totalPieces=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
+    const uniqueLists=[...new Set(lots.map(l=>l.listName).filter(Boolean))];
+    const uniqueDates=[...new Set(lots.map(l=>String(l.date||'').split('-').reverse().join('/')).filter(Boolean))];
+    const uniqueOrders=[...new Set(lots.map(l=>l.pedido).filter(Boolean))];
     const metas=report.querySelectorAll('.report-meta');
     if(metas.length>=2){
-      metas[0].innerHTML='COSTUREIRA: <b>'+esc(lot.costureira||selected||'—')+'</b> · LISTA: <b>'+esc(lot.listName||'—')+'</b>';
-      metas[1].innerHTML='DATA: <b>'+esc(String(lot.date||'').split('-').reverse().join('/'))+'</b><br>PEÇAS: <b>'+fmt(totalPieces)+'</b>';
+      metas[0].innerHTML='COSTUREIRA: <b>'+esc(selected==='TODAS'?'TODAS AS COSTUREIRAS':(lots[0].costureira||selected||'—'))+'</b> · LISTAS: <b>'+esc(uniqueLists.join(' · ')||'—')+'</b>';
+      metas[1].innerHTML='DATAS: <b>'+esc(uniqueDates.join(' · ')||'—')+'</b><br>PEÇAS: <b>'+fmt(totalPieces)+'</b>';
     }
     const info=report.querySelectorAll('.report-info-value');
-    if(info.length>=4){info[0].textContent=lot.costureira||selected||'—';info[1].textContent=lot.listName||'—';info[2].textContent=String(lot.date||'').split('-').reverse().join('/');info[3].textContent=fmt(totalPieces)}
+    if(info.length>=4){info[0].textContent=selected==='TODAS'?'TODAS AS COSTUREIRAS':(lots[0].costureira||selected||'—');info[1].textContent=uniqueLists.join(' · ')||'—';info[2].textContent=uniqueDates.join(' · ')||'—';info[3].textContent=fmt(totalPieces)}
     const products=report.querySelector('table.products');
     if(products){
       const tbody=products.querySelector('tbody');
-      if(tbody){tbody.innerHTML=items.length?items.map(x=>`<tr><td>${esc(x.product)}</td><td>${fmt(x.qty)}</td><td>${esc(x.color||'SEM COR')}</td><td class="order-number" data-costura-order="1">${esc(lot.pedido||'—')}</td></tr>`).join(''):'<tr><td colspan="4">Nenhum produto enviado para esta costureira.</td></tr>'}
+      if(tbody){
+        tbody.innerHTML=items.length?items.map(x=>`<tr><td>${esc(x.product)}</td><td>${fmt(x.qty)}</td><td>${esc(x.color||'SEM COR')}</td><td class="order-number" data-costura-order="1">${esc(x.__lot.pedido||'—')}</td></tr>`).join(''):'<tr><td colspan="4">Nenhum produto enviado.</td></tr>';
+      }
     }
     const matrix=report.querySelector('table.matrix');
     if(matrix){
@@ -75,7 +81,7 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
       if(tables[1])tables[1].querySelector('tbody').innerHTML=mx.general.length?mx.general.map(r=>`<tr><td>${esc(r.material)}${r.spec?' — '+esc(r.spec):''}</td><td>${fmt(r.qty)} ${esc(r.unit)}</td></tr>`).join(''):'<tr><td colspan="2">Nenhum.</td></tr>';
     }
     const warn=report.querySelector('.warn');if(warn){warn.outerHTML=result.missing.length?`<div class="warn"><b>FICHAS TÉCNICAS INCOMPLETAS:</b> ${result.missing.map(esc).join(', ')}. Consumo não inventado.</div>`:''}
-    report.dataset.costuraLiveLotId=signature;
+    report.dataset.costuraLiveLots=signature;
   }
   function boot(){setInterval(patch,700);setTimeout(patch,150)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
