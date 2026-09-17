@@ -2,7 +2,7 @@
 // O histórico é gravado no momento da baixa e representa a quantidade realmente enviada.
 (function(){
   const KEY='workneo-costura-lotes-v2';
-  const VERSION='costura-history-v3';
+  const VERSION='costura-history-v4';
   const norm=s=>String(s??'').trim().toUpperCase();
   const read=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'');return Array.isArray(v)?v:f}catch{return f}};
   const allLists=()=>[...read('almox-lists',[]),...read('almox-archived-lists-v1',[])];
@@ -24,12 +24,12 @@
       }
     }
     const rebuilt=[...groups.values()].filter(x=>x.items.length);
-    if(!rebuilt.length)return false;
+    if(!rebuilt.length){localStorage.setItem(VERSION,'1');return false}
     const before=JSON.stringify(read(KEY,[]));
     const after=JSON.stringify(rebuilt);
+    localStorage.setItem(VERSION,'1');
     if(before===after)return false;
     localStorage.setItem(KEY,after);
-    localStorage.setItem(VERSION,'1');
     return true;
   }
   const changed=rebuild();
