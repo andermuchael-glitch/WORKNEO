@@ -13,14 +13,48 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
   const METER=new Set(['fitaRigida','elastico','vies','pompom','elasticoRaboDeGato','cordasPoliester','elasticoFF','gorgurao','poliester','cadarco']);
   const HARDWARE=new Set(['mosquetao','fecho','passador','meiaArgola']);
   const readLots=()=>{try{const x=JSON.parse(localStorage.getItem(LOTS_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}};
-  const lotKey=l=>[String(l?.date||''),norm(l?.costureira),String(l?.pedido||'').trim()].join('|');
-  const itemFingerprint=l=>(l.items||[]).filter(x=>x&&x.product&&Number(x.qty)>0).map(x=>[norm(x.product),norm(x.color||'SEM COR'),Number(x.qty)||0]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const lotKey=l=>[String(l?.date||'').trim(),norm(l?.costureira),String(l?.pedido||'').trim()].join('|');
+  // Consolida as linhas internas de cada lote antes de comparar lotes.
+  // Assim, uma cópia gravada com a mesma peça repetida duas vezes continua
+  // sendo reconhecida como a mesma remessa, em vez de virar 97+97.
+  const normalizedItems=l=>{
+    const map=new Map();
+    for(const x of (l?.items||[])){
+      if(!x?.product||Number(x.qty)<=0)continue;
+      const product=String(x.product).trim();
+      const color=String(x.color||'SEM COR').trim()||'SEM COR';
+      const key=`${norm(product)}|${norm(color)}`;
+      const old=map.get(key);
+      if(old)old.qty=Number(old.qty||0)+Number(x.qty||0);
+      else map.set(key,{...x,product,color,qty:Number(x.qty)||0});
+    }
+    return [...map.values()].sort((a,b)=>`${norm(a.product)}|${norm(a.color)}`.localeCompare(`${norm(b.product)}|${norm(b.color)}`));
+  };
+  const itemFingerprint=l=>normalizedItems(l).map(x=>[norm(x.product),norm(x.color||'SEM COR'),Number(x.qty)||0]);
   const exactKey=l=>JSON.stringify({base:lotKey(l),items:itemFingerprint(l)});
   const uniqueLots=lots=>{
+    // Primeiro elimina cópias exatas do envio, mesmo que o objeto tenha
+    // listId/listName/createdAt diferentes ou as linhas internas estejam duplicadas.
     const seen=new Set(),unique=[];
-    for(const l of lots){const k=exactKey(l);if(seen.has(k))continue;seen.add(k);unique.push(l)}
+    for(const l of lots){
+      const k=exactKey(l);
+      if(seen.has(k))continue;
+      seen.add(k);
+      unique.push({...l,items:normalizedItems(l)});
+    }
+    // Depois consolida remessas distintas do mesmo pedido/data por produto/cor.
     const map=new Map();
-    for(const l of unique){const key=lotKey(l);let g=map.get(key);if(!g){g={...l,items:[]};map.set(key,g)}for(const x of (l.items||[])){if(!x?.product||Number(x.qty)<=0)continue;const k=`${norm(x.product)}|${norm(x.color||'SEM COR')}`;const old=g.items.find(y=>`${norm(y.product)}|${norm(y.color||'SEM COR')}`===k);if(old)old.qty=Number(old.qty||0)+Number(x.qty||0);else g.items.push({...x,qty:Number(x.qty)||0})}}
+    for(const l of unique){
+      const key=lotKey(l);
+      let g=map.get(key);
+      if(!g){g={...l,items:[]};map.set(key,g)}
+      for(const x of (l.items||[])){
+        const k=`${norm(x.product)}|${norm(x.color||'SEM COR')}`;
+        const old=g.items.find(y=>`${norm(y.product)}|${norm(y.color||'SEM COR')}`===k);
+        if(old)old.qty=Number(old.qty||0)+Number(x.qty||0);
+        else g.items.push({...x,qty:Number(x.qty)||0});
+      }
+    }
     return [...map.values()].filter(l=>l.items.length).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.pedido||'').localeCompare(String(b.pedido||'')));
   };
   const calculateItems=items=>{
