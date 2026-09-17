@@ -2,7 +2,7 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
 
 // Relatório consolidado da Costura: todos os lotes enviados para a costureira.
 // Cada lote é identificado pela DATA; o NÚMERO DO PEDIDO identifica o pedido.
-// Materiais são somados, mas cada pedido permanece identificado na tabela.
+// Se o mesmo pedido/data foi gravado mais de uma vez, seus itens são consolidados uma única vez.
 (function(){
   const LOTS_KEY='workneo-costura-lotes-v2';
   const ignored=new Set(EXCLUDED_SEWING_PRODUCTS.map(s=>String(s).trim().toUpperCase()));
@@ -14,8 +14,8 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
   const METER=new Set(['fitaRigida','elastico','vies','pompom','elasticoRaboDeGato','cordasPoliester','elasticoFF','gorgurao','poliester','cadarco']);
   const HARDWARE=new Set(['mosquetao','fecho','passador','meiaArgola']);
   const readLots=()=>{try{const x=JSON.parse(localStorage.getItem(LOTS_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}};
-  const lotSignature=l=>JSON.stringify({date:String(l?.date||''),costureira:norm(l?.costureira),pedido:String(l?.pedido||'').trim(),listId:String(l?.listId||''),listName:String(l?.listName||''),items:(l?.items||[]).map(x=>({product:String(x?.product||''),color:String(x?.color||''),qty:Number(x?.qty)||0})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))});
-  const uniqueLots=lots=>{const seen=new Set();return lots.filter(l=>{const k=lotSignature(l);if(seen.has(k))return false;seen.add(k);return true})};
+  const lotKey=l=>JSON.stringify({date:String(l?.date||''),costureira:norm(l?.costureira),pedido:String(l?.pedido||'').trim()});
+  const uniqueLots=lots=>{const map=new Map();lots.forEach(l=>{const key=lotKey(l);let g=map.get(key);if(!g){g={...l,items:[]};map.set(key,g)}(l.items||[]).forEach(x=>{if(!x?.product||Number(x.qty)<=0)return;const k=`${norm(x.product)}|${norm(x.color||'SEM COR')}`;const old=g.items.find(y=>`${norm(y.product)}|${norm(y.color||'SEM COR')}`===k);if(old)old.qty=Number(old.qty||0)+Number(x.qty||0);else g.items.push({...x,qty:Number(x.qty)||0})})});return [...map.values()]};
   const calculateItems=items=>{
     const grouped=new Map(),missing=new Set();
     const add=(material,spec,color,qty,product,unit='UN')=>{const amount=Number(qty);if(!Number.isFinite(amount)||amount===0)return;const key=[material,spec||'',color||'',unit].join('|');let r=grouped.get(key);if(!r){r={material,spec:spec||'',color:color||'',qty:0,unit,products:new Map()};grouped.set(key,r)}r.qty+=amount;r.products.set(product,(r.products.get(product)||0)+amount)};
@@ -44,13 +44,12 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
   };
   const lotsFor=(lots,selected)=>{
     const filtered=selected&&selected!=='TODAS'?lots.filter(l=>norm(l.costureira)===norm(selected)):lots.slice();
-    return uniqueLots(filtered).filter(l=>Array.isArray(l.items)&&l.items.some(i=>i&&i.product&&Number(i.qty)>0))
-      .sort((a,b)=>String(a.date||a.createdAt).localeCompare(String(b.date||b.createdAt))||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+    return uniqueLots(filtered).filter(l=>Array.isArray(l.items)&&l.items.some(i=>i&&i.product&&Number(i.qty)>0)).sort((a,b)=>String(a.date||a.createdAt).localeCompare(String(b.date||b.createdAt))||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
   };
   function patch(){
     const panel=document.getElementById('production-panel'),report=panel&&panel.querySelector('.report-onepage');if(!report)return;
     const sel=panel.querySelector('#report-seamstress'),selected=sel?sel.value:'TODAS',lots=lotsFor(readLots(),selected);if(!lots.length)return;
-    const signature=lots.map(l=>lotSignature(l)).join('|')+'|'+selected;
+    const signature=lots.map(l=>JSON.stringify({k:lotKey(l),items:l.items})).join('|')+'|'+selected;
     if(report.dataset.costuraLiveLots===signature)return;
     const items=lots.flatMap(l=>(l.items||[]).filter(x=>x&&x.product&&Number(x.qty)>0).map(x=>({...x,__lot:l})));
     const result=calculateItems(items),mx=buildMatrix(result.rows),totalPieces=items.reduce((s,x)=>s+(Number(x.qty)||0),0);
