@@ -1,41 +1,41 @@
-// Pós-processador visual do relatório de costura.
-// Não recalcula o relatório nem lê outra fonte: apenas remove linhas idênticas
-// que eventualmente sejam renderizadas novamente por módulos antigos.
+// Corrige duplicações gravadas dentro do próprio lote e mantém o pós-processamento visual.
 (function(){
+  const KEY='workneo-costura-lotes-v2';
   const norm=s=>String(s??'').trim().toUpperCase();
-  const num=s=>{const v=Number(String(s??'').replace(',','.'));return Number.isFinite(v)?v:0};
-  const fmt=n=>Number.isInteger(n)?String(n):n.toFixed(2).replace(/\.00$/,'');
-  function patch(){
-    const panel=document.getElementById('production-panel');
-    const report=panel&&panel.querySelector('.report-onepage');
-    if(!report)return;
-    const table=report.querySelector('table.products');
-    if(!table)return;
-    const tbody=table.querySelector('tbody');
-    if(!tbody)return;
-    const rows=[...tbody.querySelectorAll('tr')];
-    const groups=new Map();
-    for(const tr of rows){
-      const c=[...tr.children].map(td=>String(td.textContent||'').trim());
-      if(c.length<5)continue;
-      const key=[norm(c[0]),norm(c[2]),norm(c[3]),norm(c[4])].join('|');
-      let g=groups.get(key);
-      if(!g)groups.set(key,g={tr,values:c,qtys:[]});
-      g.qtys.push(num(c[1]));
-    }
-    if(groups.size===rows.length)return;
-    const out=[];
-    for(const g of groups.values()){
-      // Linhas completamente idênticas representam o mesmo envio gravado duas vezes.
-      // Se houver quantidades diferentes para o mesmo produto/cor/data/pedido,
-      // elas são envios distintos e devem ser somadas.
-      const distinct=[...new Set(g.qtys.map(v=>String(v)))];
-      const qty=distinct.length===1?g.qtys[0]:g.qtys.reduce((a,b)=>a+b,0);
-      const cells=g.values;
-      out.push(`<tr><td>${cells[0]}</td><td>${fmt(qty)}</td><td>${cells[2]}</td><td>${cells[3]}</td><td class="order-number" data-costura-order="1">${cells[4]}</td></tr>`);
-    }
-    tbody.innerHTML=out.join('');
+  const read=()=>{try{const v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v:[]}catch{return[]}};
+  function repair(){
+    const lots=read(); if(!lots.length)return;
+    let changed=false;
+    const fixed=lots.map(l=>{
+      const map=new Map();
+      for(const x of (l.items||[])){
+        if(!x?.product||Number(x.qty)<=0)continue;
+        const k=norm(x.product)+'|'+norm(x.color||'SEM COR');
+        const q=Number(x.qty)||0;
+        const old=map.get(k);
+        // Duas linhas exatamente iguais dentro do mesmo envio são a mesma linha,
+        // não duas quantidades a somar. Quantidades diferentes continuam somando.
+        if(old){
+          if(Number(old.qty)!==q)old.qty+=q;
+          else changed=true;
+        }else map.set(k,{...x,qty:q});
+      }
+      const items=[...map.values()];
+      if(JSON.stringify(items)!==JSON.stringify(l.items||[]))changed=true;
+      return {...l,items};
+    });
+    if(changed)localStorage.setItem(KEY,JSON.stringify(fixed));
+    return changed;
   }
-  function boot(){setInterval(patch,700);setTimeout(patch,300)}
+  repair();
+  function visual(){
+    const panel=document.getElementById('production-panel'),report=panel&&panel.querySelector('.report-onepage');
+    const tbody=report&&report.querySelector('table.products tbody'); if(!tbody)return;
+    const rows=[...tbody.querySelectorAll('tr')],groups=new Map();
+    for(const tr of rows){const c=[...tr.children].map(td=>String(td.textContent||'').trim());if(c.length<5)continue;const k=[norm(c[0]),norm(c[2]),norm(c[3]),norm(c[4])].join('|');let g=groups.get(k);if(!g)groups.set(k,{c,qs:[]});g.qs.push(Number(c[1])||0)}
+    if(groups.size===rows.length)return;
+    tbody.innerHTML=[...groups.values()].map(g=>{const qs=[...new Set(g.qs)];const q=qs.length===1?qs[0]:g.qs.reduce((a,b)=>a+b,0);return `<tr><td>${g.c[0]}</td><td>${Number.isInteger(q)?q:q.toFixed(2)}</td><td>${g.c[2]}</td><td>${g.c[3]}</td><td class="order-number" data-costura-order="1">${g.c[4]}</td></tr>`}).join('');
+  }
+  function boot(){setInterval(()=>{if(repair()){} visual()},700);setTimeout(visual,400)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
