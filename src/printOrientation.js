@@ -1,11 +1,11 @@
-/* WORKNEO — impressão A4 retrato/paisagem. Correção: evita loop do MutationObserver. */
+/* WORKNEO — impressão A4 retrato/paisagem. */
 (function(){
-  const STYLE_ID='workneo-print-orientation-style-v4';
+  const STYLE_ID='workneo-print-orientation-style-v5';
   const P='workneo-print-portrait', L='workneo-print-landscape';
   const ORIENT='workneo-print-orientation';
 
   function style(){
-    if(document.getElementById(STYLE_ID)) return;
+    if(document.getElementById(STYLE_ID))return;
     const s=document.createElement('style');
     s.id=STYLE_ID;
     s.textContent=`
@@ -17,18 +17,24 @@
       .print-orientation button{border:0;border-radius:8px;padding:8px 10px;background:transparent;color:#344054;font-weight:800;cursor:pointer;font-size:11px}
       .print-orientation button.active{background:#1769e0;color:#fff;box-shadow:0 2px 5px #0002}
       .report-onepage{font-family:Arial,sans-serif;font-size:10px;line-height:1.18;color:#101828;background:#fff;border:1px solid #d9dee7;border-radius:14px;padding:14px;box-sizing:border-box;box-shadow:0 5px 18px #10182810}
-      .report-onepage.preview-portrait{max-width:820px;margin:0 auto}.report-onepage.preview-landscape{max-width:1100px;margin:0 auto}
+      .report-onepage.preview-portrait{width:100%;max-width:820px;margin:0 auto}.report-onepage.preview-landscape{width:100%;max-width:1100px;margin:0 auto}
       @media(max-width:700px){.report-onepage{padding:10px;border-radius:10px;font-size:9px;box-shadow:none}.print-orientation{margin-left:0;width:100%;justify-content:space-between}.print-orientation-label{flex:1}}
       @media print{
-        @page{size:A4 portrait;margin:7mm}
-        html,body{margin:0!important;background:#fff!important}
-        body.workneo-print-landscape @page{size:A4 landscape;margin:5mm}
-        .report-onepage{border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;font-size:8.7px;line-height:1.1;max-height:270mm;overflow:hidden}
-        body.workneo-print-landscape .report-onepage{font-size:8.8px;max-height:190mm}
-        body.workneo-print-portrait .report-onepage{font-size:8.7px;max-height:270mm}
+        @page{size:A4 portrait;margin:6mm}
+        @page landscape{size:A4 landscape;margin:6mm}
+        html,body{margin:0!important;padding:0!important;background:#fff!important;width:auto!important;min-width:0!important}
+        body.workneo-print-landscape{page:landscape}
+        body.workneo-print-portrait{page:portrait}
+        body>*:not(#production-overlay){ }
+        .report-onepage{width:100%!important;max-width:none!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;font-size:10.5px;line-height:1.18;box-sizing:border-box;transform:none!important;zoom:1!important;overflow:visible!important;max-height:none!important}
+        body.workneo-print-landscape .report-onepage{font-size:11px;line-height:1.18}
+        body.workneo-print-landscape .report-onepage table{width:100%!important;font-size:11px}
+        body.workneo-print-landscape .report-onepage th,body.workneo-print-landscape .report-onepage td{padding:4px 6px}
+        body.workneo-print-portrait .report-onepage{font-size:10px;line-height:1.15}
+        body.workneo-print-landscape .report-title{min-height:0!important}
       }
     `;
-    document.head.appendChild(s);
+    document.head.appendChild(s)
   }
 
   function setOrientation(mode,save=true){
@@ -50,8 +56,6 @@
     const pb=document.getElementById('prod-print');
     if(pb){
       const text=land?'🖨️ IMPRIMIR A4 · PAISAGEM':'🖨️ IMPRIMIR A4 · RETRATO';
-      /* IMPORTANTE: não reatribuir textContent se já estiver correto.
-         Isso evita disparar o MutationObserver em loop. */
       if(pb.textContent!==text)pb.textContent=text;
     }
   }
@@ -72,8 +76,7 @@
       c.querySelectorAll('button').forEach(b=>b.onclick=()=>setOrientation(b.dataset.orientation));
     }
     setOrientation(saved(),false);
-    const current=pb.dataset.printHandlerInstalled==='1';
-    if(!current){
+    if(pb.dataset.printHandlerInstalled!=='1'){
       pb.dataset.printHandlerInstalled='1';
       pb.onclick=()=>{setOrientation(document.body.classList.contains(L)?'landscape':'portrait');window.print()};
     }
@@ -82,7 +85,6 @@
   function boot(){
     style();
     const observer=new MutationObserver(()=>{
-      /* Agrupa as alterações do relatório e evita reentrância. */
       if(boot.pending)return;
       boot.pending=true;
       requestAnimationFrame(()=>{boot.pending=false;install()});
