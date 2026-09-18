@@ -59,35 +59,47 @@ function renderCostureiras(panel,list){
   panel.querySelector('.prod-body').innerHTML='<div class="prod-note"><b>COSTURA:</b> O envio para costura é feito exclusivamente pelo botão <b>➜ ENVIAR PARA COSTURA</b> na lista do Almoxarifado.</div>';
 }
 
+function readCosturaHistory(){
+  const read=(key)=>{try{const x=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}};
+  const src=[...read('almox-lists'),...read('workneo-listas-arquivadas-v1')],lists=new Map();
+  for(const l of src){const id=String(l?.id||'');if(id&&!lists.has(id))lists.set(id,l)}
+  const events=new Set(),rows=[];
+  for(const list of lists.values()) for(const h of (Array.isArray(list.history)?list.history:[])){
+    if(String(h?.type||'').toLowerCase()!=='costura'||!h?.product||!h?.costureira)continue;
+    const qty=Math.abs(Number(h.qty)||0);if(qty<=0)continue;
+    const date=String(h.at||'').slice(0,10),color=String(h.color||'SEM COR').trim()||'SEM COR',pedido=String(h.pedido||'').trim();
+    const key=[String(list.id),date,norm(h.costureira),pedido,norm(h.product),norm(color),qty].join('|');
+    if(events.has(key))continue;events.add(key);
+    rows.push({listId:String(list.id),listName:String(list.name||'—'),date,costureira:String(h.costureira).trim(),pedido,product:String(h.product).trim(),color,qty});
+  }
+  return rows;
+}
 function renderReport(panel,list){
-  const assignments=getAssignments();
-  const names=[...new Set(assignments.map(a=>a.costureira).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const selected=panel.dataset.reportCostureira||'TODAS';
-  const cost=selected==='TODAS'?assignments:assignments.filter(a=>a.costureira===selected);
-  const products=aggregateProducts(cost);
-  const result=calculateItems(cost.map(a=>({product:a.product,color:a.color,total:a.qty})));
-  const mx=buildMatrix(result.rows);
-  const totalPieces=cost.reduce((s,a)=>s+Number(a.qty||0),0);
-  let html='<div class="report-filter"><label>COSTUREIRA:</label><select class="report-select" id="report-seamstress"><option value="TODAS">TODAS</option>'+names.map(n=>`<option value="${esc(n)}" ${n===selected?'selected':''}>${esc(n)}</option>`).join('')+'</select><button class="prod-action" id="prod-print">🖨️ IMPRIMIR A4 · 1 PÁGINA</button></div>';
-  html+=`<div class="report-onepage"><div class="report-title"><div><h1>WORKNEO · RELATÓRIO DE MATERIAIS PARA COSTURA</h1><div class="report-meta">COSTUREIRA: <b>${esc(selected==='TODAS'?'TODAS AS COSTUREIRAS':selected)}</b> · LISTA: <b>${esc(list?.name||'—')}</b></div></div><div class="report-meta">DATA: <b>${new Date().toLocaleDateString('pt-BR')}</b><br>PEÇAS: <b>${fmt(totalPieces)}</b></div></div>`;
-  html+='<div class="report-section">1. PRODUTOS PARA COSTURA</div><table class="products"><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>ACABAMENTO</th></tr></thead><tbody>';
-  if(!products.length)html+='<tr><td colspan="4">Nenhum produto enviado para esta costureira.</td></tr>';else products.forEach(p=>html+=`<tr><td>${esc(p.product)}</td><td>${fmt(p.qty)}</td><td>${esc(p.color||'SEM COR')}</td><td></td></tr>`);html+='</tbody></table>';
-  html+='<div class="report-section">2. MATERIAIS POR COR</div><table class="matrix"><thead><tr><th>MATERIAL / ESPECIFICAÇÃO</th>'+mx.colors.map(c=>`<th>${esc(c)}</th>`).join('')+'<th>TOTAL</th></tr></thead><tbody>';
-  if(!mx.groups.length)html+=`<tr><td colspan="${mx.colors.length+2}">Nenhum material por cor calculado.</td></tr>`;
-  mx.groups.forEach(g=>{const total=[...g.byColor.values()].reduce((s,v)=>s+v,0);html+=`<tr><td>${esc(g.material)}${g.spec?` — ${esc(g.spec)}`:''} <small>(${g.unit})</small></td>`+mx.colors.map(c=>`<td>${g.byColor.has(c)?fmt(g.byColor.get(c)):'—'}</td>`).join('')+`<td class="total">${fmt(total)}</td></tr>`;});
-  html+='</tbody></table>';
-  html+='<div class="two-col"><div><div class="subsection">3. FERRAGENS E REGULADORES</div><table><thead><tr><th>MATERIAL</th><th>TOTAL</th></tr></thead><tbody>';
-  if(mx.hardware.length)mx.hardware.forEach(r=>html+=`<tr><td>${esc(r.material)}${r.color?' · '+esc(r.color):''}</td><td>${fmt(r.qty)} ${r.unit}</td></tr>`);else html+='<tr><td colspan="2">Nenhuma ferragem.</td></tr>';
+  const all=readCosturaHistory(),names=[...new Set(all.map(a=>a.costureira).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const selected=panel.dataset.reportCostureira||'TODAS',cost=selected==='TODAS'?all:all.filter(a=>norm(a.costureira)===norm(selected));
+  const productMap=new Map();cost.forEach(a=>{const k=norm(a.product)+'|'+norm(a.color);const old=productMap.get(k);if(old)old.qty+=a.qty;else productMap.set(k,{product:a.product,color:a.color,qty:a.qty})});
+  const products=[...productMap.values()].sort((a,b)=>(a.product+'|'+a.color).localeCompare(b.product+'|'+b.color));
+  const result=calculateItems(cost.map(a=>({product:a.product,color:a.color,total:a.qty}))),mx=buildMatrix(result.rows),totalPieces=cost.reduce((s,a)=>s+Number(a.qty||0),0);
+  const lists=[...new Set(cost.map(a=>a.listName).filter(Boolean))],dates=[...new Set(cost.map(a=>a.date).filter(Boolean))],orders=[...new Set(cost.map(a=>a.pedido).filter(Boolean))];
+  const dateBR=s=>String(s||'').includes('-')?String(s).split('-').reverse().join('/'):String(s||'—');
+  let html='<div class="report-filter"><label>COSTUREIRA:</label><select class="report-select" id="report-seamstress"><option value="TODAS">TODAS</option>'+names.map(n=>'<option value="'+esc(n)+'" '+(n===selected?'selected':'')+'>'+esc(n)+'</option>').join('')+'</select><button class="prod-action" id="prod-print">🖨️ IMPRIMIR A4 · 1 PÁGINA</button></div>';
+  html+='<div class="report-onepage"><div class="report-title"><div><h1>WORKNEO · RELATÓRIO DE MATERIAIS PARA COSTURA</h1><div class="report-meta">COSTUREIRA: <b>'+esc(selected==='TODAS'?'TODAS AS COSTUREIRAS':(cost[0]?.costureira||selected||'—'))+'</b> · LISTAS: <b>'+esc(lists.join(' · ')||'—')+'</b></div></div><div class="report-meta">LOTES / DATAS: <b>'+esc(dates.map(dateBR).join(' · ')||'—')+'</b> · PEDIDOS: <b>'+esc(orders.join(' · ')||'—')+'</b><br>PEÇAS: <b>'+fmt(totalPieces)+'</b></div></div>';
+  html+='<div class="report-section">1. PRODUTOS PARA COSTURA</div><table class="products"><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>LOTE / DATA</th><th>NÚMERO DO PEDIDO</th></tr></thead><tbody>';
+  if(!cost.length)html+='<tr><td colspan="5">Nenhum produto enviado para esta costureira.</td></tr>';else cost.forEach(a=>html+='<tr><td>'+esc(a.product)+'</td><td>'+fmt(a.qty)+'</td><td>'+esc(a.color)+'</td><td>'+esc(dateBR(a.date)||'—')+'</td><td class="order-number">'+esc(a.pedido||'—')+'</td></tr>');
+  html+='</tbody></table><div class="report-section">2. MATERIAIS POR COR</div><table class="matrix"><thead><tr><th>MATERIAL / ESPECIFICAÇÃO</th>'+mx.colors.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>TOTAL</th></tr></thead><tbody>';
+  if(!mx.groups.length)html+='<tr><td colspan="'+(mx.colors.length+2)+'">Nenhum material por cor calculado.</td></tr>';
+  mx.groups.forEach(g=>{const total=[...g.byColor.values()].reduce((s,v)=>s+v,0);html+='<tr><td>'+esc(g.material)+(g.spec?' — '+esc(g.spec):'')+' <small>('+g.unit+')</small></td>'+mx.colors.map(c=>'<td>'+(g.byColor.has(c)?fmt(g.byColor.get(c)):'—')+'</td>').join('')+'<td class="total">'+fmt(total)+'</td></tr>'});
+  html+='</tbody></table><div class="two-col"><div><div class="subsection">3. FERRAGENS E REGULADORES</div><table><thead><tr><th>MATERIAL</th><th>TOTAL</th></tr></thead><tbody>';
+  if(mx.hardware.length)mx.hardware.forEach(r=>html+='<tr><td>'+esc(r.material)+(r.color?' · '+esc(r.color):'')+'</td><td>'+fmt(r.qty)+' '+r.unit+'</td></tr>');else html+='<tr><td colspan="2">Nenhuma ferragem.</td></tr>';
   html+='</tbody></table></div><div><div class="subsection">4. MATERIAIS SEM COR</div><table><thead><tr><th>MATERIAL</th><th>TOTAL</th></tr></thead><tbody>';
-  if(mx.general.length)mx.general.forEach(r=>html+=`<tr><td>${esc(r.material)}${r.spec?' — '+esc(r.spec):''}</td><td>${fmt(r.qty)} ${r.unit}</td></tr>`);else html+='<tr><td colspan="2">Nenhum.</td></tr>';
+  if(mx.general.length)mx.general.forEach(r=>html+='<tr><td>'+esc(r.material)+(r.spec?' — '+esc(r.spec):'')+'</td><td>'+fmt(r.qty)+' '+r.unit+'</td></tr>');else html+='<tr><td colspan="2">Nenhum.</td></tr>';
   html+='</tbody></table></div></div>';
-  if(result.missing.length)html+=`<div class="warn"><b>FICHAS TÉCNICAS INCOMPLETAS:</b> ${result.missing.map(esc).join(', ')}. Consumo não inventado.</div>`;
-  html+='<div class="foot">Materiais calculados exclusivamente a partir das fichas técnicas cadastradas no WORKNEO. A quantidade enviada para a costureira é uma distribuição e não altera a Aba 1.</div></div>';
+  if(result.missing.length)html+='<div class="warn"><b>FICHAS TÉCNICAS INCOMPLETAS:</b> '+result.missing.map(esc).join(', ')+'. Consumo não inventado.</div>';
+  html+='<div class="foot">Fonte dos envios: histórico das baixas realizadas pela aba Lista. Combinações idênticas são contadas uma única vez. Materiais calculados pelas fichas técnicas.</div></div>';
   panel.querySelector('.prod-body').innerHTML=html;
-  const sel=panel.querySelector('#report-seamstress');if(sel)sel.onchange=()=>{panel.dataset.reportCostureira=sel.value;render('relatorio');};
+  const sel=panel.querySelector('#report-seamstress');if(sel)sel.onchange=()=>{panel.dataset.reportCostureira=sel.value;render('relatorio')};
   const print=panel.querySelector('#prod-print');if(print)print.onclick=()=>window.print();
 }
-
 function render(tab){const overlay=document.getElementById('production-overlay');if(!overlay)return;const panel=document.getElementById('production-panel'),list=activeList();if(tab==='materiais')renderMaterials(panel,list);else if(tab==='producao')renderProduction(panel,list);else renderReport(panel,list);panel.querySelectorAll('.prod-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));}
 function mount(){if(document.getElementById('production-launch'))return;addStyle();const button=document.createElement('button');button.id='production-launch';button.textContent='🏭 PRODUÇÃO';button.onclick=()=>{document.getElementById('production-overlay').style.display='block';render('materiais');};document.body.appendChild(button);const overlay=document.createElement('div');overlay.id='production-overlay';overlay.innerHTML='<div id="production-panel"><div class="prod-head"><div><small>WORKNEO · PRODUÇÃO</small><h2>Planejamento e separação de materiais</h2></div><button class="prod-close" id="prod-close">×</button></div><div class="prod-tabs"><button class="prod-tab active" data-tab="materiais">📦 Materiais</button><button class="prod-tab" data-tab="producao">🏭 Produção</button><button class="prod-tab" data-tab="relatorio">📄 Relatório</button></div><div class="prod-body"></div></div>';document.body.appendChild(overlay);document.getElementById('prod-close').onclick=()=>overlay.style.display='none';overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none';});overlay.querySelectorAll('.prod-tab').forEach(b=>b.onclick=()=>render(b.dataset.tab));}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
