@@ -26,7 +26,8 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
         if(String(h.type||'').toLowerCase()!=='costura'||!h.product||!h.costureira)continue;
         const qty=Math.abs(Number(h.qty)||0);if(qty<=0)continue;
         const at=String(h.at||''),date=at.slice(0,10),pedido=String(h.pedido||'').trim(),color=String(h.color||'SEM COR').trim()||'SEM COR';
-        const eventKey=[String(list.id||''),at,norm(h.costureira),pedido,norm(h.product),norm(color),qty].join('|');
+        const listKey=norm(list.name||'');
+        const eventKey=[listKey,date,norm(h.costureira),pedido,norm(h.product),norm(color),qty].join('|');
         if(events.has(eventKey))continue;
         events.add(eventKey);
         const key=[listKey,date,norm(h.costureira),pedido].join('|');
