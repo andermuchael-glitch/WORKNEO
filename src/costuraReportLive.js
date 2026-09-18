@@ -12,7 +12,32 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
   const LABELS={linhaZigM:'LINHA — ZIG',linhaRetaM:'LINHA — RETA',fitaRigida:'FITA RÍGIDA',elastico:'ELÁSTICO',vies:'VIÉS',pompom:'POMPOM',elasticoRaboDeGato:'ELÁSTICO RABO DE GATO',cordasPoliester:'CORDAS POLIÉSTER',elasticoFF:'ELÁSTICO FF',gorgurao:'GORGURÃO',poliester:'POLIÉSTER',cadarco:'CADARÇO',mosquetao:'MOSQUETÃO',fecho:'FECHO',passador:'PASSADOR',meiaArgola:'MEIA ARGOLA',reguladorFocinhoPorco:'REGULADOR FOCINHO DE PORCO',etiqueta:'ETIQUETA',velcro:'VELCRO',borrachaElastico:'BORRACHA',espuma:'ESPUMA',plasticoTransparente:'PLÁSTICO TRANSPARENTE',forroTermico:'FORRO TÉRMICO',forroImpermeavel:'FORRO IMPERMEÁVEL',plasticoDuro:'PLÁSTICO DURO',telaBolso:'TELA DE BOLSO',forroMatelace:'FORRO MATELACÊ'};
   const METER=new Set(['fitaRigida','elastico','vies','pompom','elasticoRaboDeGato','cordasPoliester','elasticoFF','gorgurao','poliester','cadarco']);
   const HARDWARE=new Set(['mosquetao','fecho','passador','meiaArgola']);
-  const readLots=()=>{try{const x=JSON.parse(localStorage.getItem(LOTS_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}};
+  const readLots=()=>{
+    // Fonte oficial do relatório: histórico das baixas reais da separação.
+    // Os lotes antigos podem estar multiplicados por versões anteriores e, por isso,
+    // não devem ser usados para calcular as quantidades.
+    const read=(key)=>{try{const x=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}};
+    const src=[...read('almox-lists'),...read('workneo-listas-arquivadas-v1')];
+    const lists=new Map();
+    for(const l of src){const id=String(l?.id||'');if(id&&!lists.has(id))lists.set(id,l)}
+    const events=new Set(),groups=new Map();
+    for(const list of lists.values()){
+      for(const h of (Array.isArray(list.history)?list.history:[])){
+        if(String(h.type||'').toLowerCase()!=='costura'||!h.product||!h.costureira)continue;
+        const qty=Math.abs(Number(h.qty)||0);if(qty<=0)continue;
+        const at=String(h.at||''),date=at.slice(0,10),pedido=String(h.pedido||'').trim(),color=String(h.color||'SEM COR').trim()||'SEM COR';
+        const eventKey=[String(list.id||''),at,norm(h.costureira),pedido,norm(h.product),norm(color),qty].join('|');
+        if(events.has(eventKey))continue;
+        events.add(eventKey);
+        const key=[String(list.id||''),date,norm(h.costureira),pedido].join('|');
+        let g=groups.get(key);
+        if(!g)g={id:'history-'+groups.size,date,costureira:String(h.costureira).trim(),pedido,listId:String(list.id||''),listName:String(list.name||''),createdAt:at,items:[]};
+        const old=g.items.find(x=>norm(x.product)===norm(h.product)&&norm(x.color)===norm(color));
+        if(old)old.qty+=qty;else g.items.push({product:String(h.product).trim(),color,qty});
+      }
+    }
+    return [...groups.values()].filter(x=>x.items.length);
+  };
   const lotKey=l=>[String(l?.date||'').trim(),norm(l?.costureira),String(l?.pedido||'').trim()].join('|');
   // Consolida as linhas internas de cada lote antes de comparar lotes.
   // Assim, uma cópia gravada com a mesma peça repetida duas vezes continua
