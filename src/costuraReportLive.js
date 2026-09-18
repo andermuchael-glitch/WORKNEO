@@ -29,7 +29,7 @@ import { TECHNICAL_SHEETS, EXCLUDED_SEWING_PRODUCTS } from './productionData.js'
         const eventKey=[String(list.id||''),at,norm(h.costureira),pedido,norm(h.product),norm(color),qty].join('|');
         if(events.has(eventKey))continue;
         events.add(eventKey);
-        const key=[String(list.id||''),date,norm(h.costureira),pedido].join('|');
+        const key=[listKey,date,norm(h.costureira),pedido].join('|');
         let g=groups.get(key);
         if(!g)g={id:'history-'+groups.size,date,costureira:String(h.costureira).trim(),pedido,listId:String(list.id||''),listName:String(list.name||''),createdAt:at,items:[]};
         const old=g.items.find(x=>norm(x.product)===norm(h.product)&&norm(x.color)===norm(color));
