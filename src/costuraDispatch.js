@@ -1,4 +1,4 @@
-const COSTUREIRAS=['ELENI','MARA','SANDRA','MIRIAN','MARINA','ADRIANA','DONA JOSI','JAMINA'];
+const COSTUREIRAS=['ELENI','MARA','SANDRA','MIRIAN','MARINA','ADRIANA','DONA JOSI','JAMINA','COSTURA INTERNA'];
 const KEY='workneo-costura-lotes-v2';
 const EXCLUDED=new Set(['MÁSCARA PROTETORA','MOUSE PAD','MOUSE PAD GAMER','PORTA COPOS']);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,6 +43,75 @@ function renderConfirm(o,data){
   o.querySelector('#cd-preview-report').onclick=()=>showPreDispatchReport(o,data);
   o.querySelector('#cd-back').onclick=()=>{draft=[];renderSend(o)};
   o.querySelector('#cd-confirm').onclick=()=>confirmDispatch(o,data);
+}
+function confirmDispatch(o,data){
+  if(confirming)return;
+  confirming=true;
+  const btn=o.querySelector('#cd-confirm');
+  if(btn){btn.disabled=true;btn.textContent='PROCESSANDO...';}
+  try{
+    const listId=String(data.listId||'');
+    const lists=readLists();
+    const list=lists.find(l=>String(l?.id||'')===listId);
+    if(!list)throw new Error('Lista não encontrada.');
+    const currentItems=list.items&&typeof list.items==='object'&&!Array.isArray(list.items)?list.items:{};
+    const requested=(data.items||[]).map(x=>({...x,qty:Number(x.qty)||0})).filter(x=>x.product&&x.qty>0);
+    if(!requested.length)throw new Error('Nenhum item selecionado.');
+    for(const x of requested){
+      const k=keyOf(x.product,x.color||'SEM COR');
+      const available=Number(currentItems?.[k]?.total)||0;
+      if(x.qty>available)throw new Error('Quantidade maior que a disponível para '+x.product+' · '+(x.color||'SEM COR')+'.');
+    }
+    const lots=readLots();
+    const signature=JSON.stringify({
+      date:String(data.date||''),
+      costureira:String(data.costureira||'').trim().toUpperCase(),
+      pedido:String(data.pedido||'').trim().toUpperCase(),
+      listId,
+      items:requested.map(x=>[String(x.product).trim().toUpperCase(),String(x.color||'SEM COR').trim().toUpperCase(),Number(x.qty)||0]).sort()
+    });
+    const duplicate=lots.some(l=>JSON.stringify({
+      date:String(l?.date||''),
+      costureira:String(l?.costureira||'').trim().toUpperCase(),
+      pedido:String(l?.pedido||'').trim().toUpperCase(),
+      listId:String(l?.listId||''),
+      items:(l?.items||[]).map(x=>[String(x.product).trim().toUpperCase(),String(x.color||'SEM COR').trim().toUpperCase(),Number(x.qty)||0]).sort()
+    })===signature);
+    if(duplicate)throw new Error('Este envio já foi registrado. Não foi criado outro lançamento.');
+    const now=new Date().toISOString();
+    const lot={
+      id:String(Date.now())+'-'+Math.random().toString(16).slice(2),
+      date:String(data.date||''),
+      costureira:String(data.costureira||'').trim(),
+      pedido:String(data.pedido||'').trim(),
+      listId,
+      listName:String(data.listName||list.name||''),
+      createdAt:now,
+      items:requested
+    };
+    const updatedItems={...currentItems};
+    const history=Array.isArray(list.history)?[...list.history]:[];
+    for(const x of requested){
+      const k=keyOf(x.product,x.color||'SEM COR');
+      const old=updatedItems[k]||{};
+      const next=Math.max(0,(Number(old.total)||0)-x.qty);
+      if(next<=0)delete updatedItems[k];
+      else updatedItems[k]={...old,total:next};
+      history.push({type:'costura',product:x.product,color:x.color||'SEM COR',qty:-x.qty,at:now,costureira:lot.costureira,pedido:lot.pedido,date:lot.date});
+    }
+    const updatedLists=lists.map(l=>String(l?.id||'')===listId?{...l,items:updatedItems,history}:l);
+    saveLots([...lots,lot]);
+    localStorage.setItem('almox-lists',JSON.stringify(updatedLists));
+    draft=[];
+    confirming=false;
+    alert('Envio arquivado com sucesso. As quantidades enviadas foram retiradas da separação.');
+    o.remove();
+    location.reload();
+  }catch(err){
+    confirming=false;
+    if(btn){btn.disabled=false;btn.textContent='✓ CONFIRMAR E ARQUIVAR ENVIO';}
+    alert(err?.message||'Não foi possível concluir o envio para a costura.');
+  }
 }
 function renderArchived(o){const lots=readLots().sort((a,b)=>String(b.date).localeCompare(String(a.date)));const body=o.querySelector('.cd-body');if(!lots.length){body.innerHTML='<div class="cd-empty">Nenhum envio arquivado.</div>';return}body.innerHTML='<div class="cd-toolbar"><button class="cd-btn cd-muted" id="cd-refresh">↻ ATUALIZAR</button></div>'+lots.map((l,i)=>`<div class="cd-batch"><div class="cd-batch-head"><div><b>${esc(l.date.split('-').reverse().join('/'))}</b> · <span class="cd-badge">${esc(l.costureira)}</span> · Pedido <b>${esc(l.pedido)}</b><br><small>Origem: ${esc(l.listName||'—')}</small></div><div class="cd-actions"><button class="cd-btn cd-primary" data-report="${i}">📄 RELATÓRIO</button></div></div><div class="cd-batch-body">${(l.items||[]).map(x=>`<div class="cd-item"><span>${esc(x.product)} · ${esc(x.color)}</span><b>${fmt(x.qty)}</b></div>`).join('')}</div></div>`).join('');o.querySelector('#cd-refresh').onclick=()=>renderArchived(o);o.querySelectorAll('[data-report]').forEach(b=>b.onclick=()=>showBatchReport(o,lots[Number(b.dataset.report)]))}
 function openPrintDialog(){window.focus();setTimeout(()=>window.print(),80)}
