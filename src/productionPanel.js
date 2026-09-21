@@ -59,33 +59,84 @@ function renderCostureiras(panel,list){
   panel.querySelector('.prod-body').innerHTML='<div class="prod-note"><b>COSTURA:</b> O envio para costura é feito exclusivamente pelo botão <b>➜ ENVIAR PARA COSTURA</b> na lista do Almoxarifado.</div>';
 }
 
-function readCosturaHistory(){
+function readCosturaLots(){
   const read=(key)=>{try{const x=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}};
-  const src=[...read('almox-lists'),...read('workneo-listas-arquivadas-v1')],lists=new Map();
-  for(const l of src){const id=String(l?.id||'');if(id&&!lists.has(id))lists.set(id,l)}
-  const events=new Set(),rows=[];
-  for(const list of lists.values()) for(const h of (Array.isArray(list.history)?list.history:[])){
-    if(String(h?.type||'').toLowerCase()!=='costura'||!h?.product||!h?.costureira)continue;
-    const qty=Math.abs(Number(h.qty)||0);if(qty<=0)continue;
-    const date=String(h.at||'').slice(0,10),color=String(h.color||'SEM COR').trim()||'SEM COR',pedido=String(h.pedido||'').trim();
-    const key=[String(list.id),date,norm(h.costureira),pedido,norm(h.product),norm(color),qty].join('|');
-    if(events.has(key))continue;events.add(key);
-    rows.push({listId:String(list.id),listName:String(list.name||'—'),date,costureira:String(h.costureira).trim(),pedido,product:String(h.product).trim(),color,qty});
+  const lots=read('workneo-costura-lotes-v2');
+  const seen=new Set(),rows=[];
+  for(const lot of lots){
+    if(!lot?.id||!lot?.costureira)continue;
+    const date=String(lot.date||'').trim();
+    const pedido=String(lot.pedido||'').trim();
+    const itemsMap=new Map();
+    for(const x of (Array.isArray(lot.items)?lot.items:[])){
+      if(!x?.product||Number(x.qty)<=0)continue;
+      const product=String(x.product).trim();
+      const color=String(x.color||'SEM COR').trim()||'SEM COR';
+      const k=norm(product)+'|'+norm(color);
+      const old=itemsMap.get(k);
+      if(old)old.qty+=Number(x.qty)||0;
+      else itemsMap.set(k,{product,color,qty:Number(x.qty)||0});
+    }
+    const items=[...itemsMap.values()].sort((a,b)=>(norm(a.product)+'|'+norm(a.color)).localeCompare(norm(b.product)+'|'+norm(b.color)));
+    if(!items.length)continue;
+    const signature=JSON.stringify({
+      date,
+      costureira:norm(lot.costureira),
+      pedido:norm(pedido),
+      listId:String(lot.listId||''),
+      listName:String(lot.listName||''),
+      items:items.map(x=>[norm(x.product),norm(x.color),Number(x.qty)||0])
+    });
+    if(seen.has(signature))continue;
+    seen.add(signature);
+    rows.push({
+      id:String(lot.id),
+      listName:String(lot.listName||'—'),
+      date,
+      costureira:String(lot.costureira).trim(),
+      pedido,
+      items
+    });
   }
   return rows;
 }
 function renderReport(panel,list){
-  const all=readCosturaHistory(),names=[...new Set(all.map(a=>a.costureira).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const selected=panel.dataset.reportCostureira||'TODAS',cost=selected==='TODAS'?all:all.filter(a=>norm(a.costureira)===norm(selected));
-  const productMap=new Map();cost.forEach(a=>{const k=norm(a.product)+'|'+norm(a.color);const old=productMap.get(k);if(old)old.qty+=a.qty;else productMap.set(k,{product:a.product,color:a.color,qty:a.qty})});
-  const products=[...productMap.values()].sort((a,b)=>(a.product+'|'+a.color).localeCompare(b.product+'|'+b.color));
-  const result=calculateItems(cost.map(a=>({product:a.product,color:a.color,total:a.qty}))),mx=buildMatrix(result.rows),totalPieces=cost.reduce((s,a)=>s+Number(a.qty||0),0);
-  const lists=[...new Set(cost.map(a=>a.listName).filter(Boolean))],dates=[...new Set(cost.map(a=>a.date).filter(Boolean))],orders=[...new Set(cost.map(a=>a.pedido).filter(Boolean))];
+  const lots=readCosturaLots();
+  const names=[...new Set(lots.map(a=>a.costureira).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const selected=panel.dataset.reportCostureira||'TODAS';
+  const selectedLots=selected==='TODAS'?lots:lots.filter(a=>norm(a.costureira)===norm(selected));
+  const rowsMap=new Map();
+  for(const lot of selectedLots){
+    for(const x of lot.items){
+      const k=[norm(x.product),norm(x.color),lot.date,norm(lot.pedido)].join('|');
+      const old=rowsMap.get(k);
+      if(old)old.qty+=Number(x.qty)||0;
+      else rowsMap.set(k,{product:x.product,color:x.color,qty:Number(x.qty)||0,date:lot.date,pedido:lot.pedido,listName:lot.listName});
+    }
+  }
+  const cost=[...rowsMap.values()].sort((a,b)=>
+    [a.date,a.pedido,norm(a.product),norm(a.color)].join('|').localeCompare([b.date,b.pedido,norm(b.product),norm(b.color)].join('|'))
+  );
+  const materialItems=[];
+  const productMap=new Map();
+  for(const a of cost){
+    const k=norm(a.product)+'|'+norm(a.color);
+    const old=productMap.get(k);
+    if(old)old.qty+=Number(a.qty)||0;
+    else productMap.set(k,{product:a.product,color:a.color,qty:Number(a.qty)||0});
+  }
+  for(const a of productMap.values())materialItems.push({product:a.product,color:a.color,total:a.qty});
+  const result=calculateItems(materialItems),mx=buildMatrix(result.rows);
+  const totalPieces=[...productMap.values()].reduce((s,a)=>s+Number(a.qty||0),0);
+  const lists=[...new Set(cost.map(a=>a.listName).filter(Boolean))];
+  const dates=[...new Set(cost.map(a=>a.date).filter(Boolean))];
+  const orders=[...new Set(cost.map(a=>a.pedido).filter(Boolean))];
   const dateBR=s=>String(s||'').includes('-')?String(s).split('-').reverse().join('/'):String(s||'—');
   let html='<div class="report-filter"><label>COSTUREIRA:</label><select class="report-select" id="report-seamstress"><option value="TODAS">TODAS</option>'+names.map(n=>'<option value="'+esc(n)+'" '+(n===selected?'selected':'')+'>'+esc(n)+'</option>').join('')+'</select><button class="prod-action" id="prod-print">🖨️ IMPRIMIR A4 · 1 PÁGINA</button></div>';
-  html+='<div class="report-onepage"><div class="report-title"><div><h1>WORKNEO · RELATÓRIO DE MATERIAIS PARA COSTURA</h1><div class="report-meta">COSTUREIRA: <b>'+esc(selected==='TODAS'?'TODAS AS COSTUREIRAS':(cost[0]?.costureira||selected||'—'))+'</b> · LISTAS: <b>'+esc(lists.join(' · ')||'—')+'</b></div></div><div class="report-meta">LOTES / DATAS: <b>'+esc(dates.map(dateBR).join(' · ')||'—')+'</b> · PEDIDOS: <b>'+esc(orders.join(' · ')||'—')+'</b><br>PEÇAS: <b>'+fmt(totalPieces)+'</b></div></div>';
+  html+='<div class="report-onepage"><div class="report-title"><div><h1>WORKNEO · RELATÓRIO DE MATERIAIS PARA COSTURA</h1><div class="report-meta">COSTUREIRA: <b>'+esc(selected==='TODAS'?'TODAS AS COSTUREIRAS':(selectedLots[0]?.costureira||selected||'—'))+'</b> · LISTAS: <b>'+esc(lists.join(' · ')||'—')+'</b></div></div><div class="report-meta">LOTES / DATAS: <b>'+esc(dates.map(dateBR).join(' · ')||'—')+'</b> · PEDIDOS: <b>'+esc(orders.join(' · ')||'—')+'</b><br>PEÇAS: <b>'+fmt(totalPieces)+'</b></div></div>';
   html+='<div class="report-section">1. PRODUTOS PARA COSTURA</div><table class="products"><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>LOTE / DATA</th><th>NÚMERO DO PEDIDO</th></tr></thead><tbody>';
-  if(!cost.length)html+='<tr><td colspan="5">Nenhum produto enviado para esta costureira.</td></tr>';else cost.forEach(a=>html+='<tr><td>'+esc(a.product)+'</td><td>'+fmt(a.qty)+'</td><td>'+esc(a.color)+'</td><td>'+esc(dateBR(a.date)||'—')+'</td><td class="order-number">'+esc(a.pedido||'—')+'</td></tr>');
+  if(!cost.length)html+='<tr><td colspan="5">Nenhum produto enviado para esta costureira.</td></tr>';
+  else cost.forEach(a=>html+='<tr><td>'+esc(a.product)+'</td><td>'+fmt(a.qty)+'</td><td>'+esc(a.color)+'</td><td>'+esc(dateBR(a.date)||'—')+'</td><td class="order-number">'+esc(a.pedido||'—')+'</td></tr>');
   html+='</tbody></table><div class="report-section">2. MATERIAIS POR COR</div><table class="matrix"><thead><tr><th>MATERIAL / ESPECIFICAÇÃO</th>'+mx.colors.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>TOTAL</th></tr></thead><tbody>';
   if(!mx.groups.length)html+='<tr><td colspan="'+(mx.colors.length+2)+'">Nenhum material por cor calculado.</td></tr>';
   mx.groups.forEach(g=>{const total=[...g.byColor.values()].reduce((s,v)=>s+v,0);html+='<tr><td>'+esc(g.material)+(g.spec?' — '+esc(g.spec):'')+' <small>('+g.unit+')</small></td>'+mx.colors.map(c=>'<td>'+(g.byColor.has(c)?fmt(g.byColor.get(c)):'—')+'</td>').join('')+'<td class="total">'+fmt(total)+'</td></tr>'});
@@ -95,7 +146,7 @@ function renderReport(panel,list){
   if(mx.general.length)mx.general.forEach(r=>html+='<tr><td>'+esc(r.material)+(r.spec?' — '+esc(r.spec):'')+'</td><td>'+fmt(r.qty)+' '+r.unit+'</td></tr>');else html+='<tr><td colspan="2">Nenhum.</td></tr>';
   html+='</tbody></table></div></div>';
   if(result.missing.length)html+='<div class="warn"><b>FICHAS TÉCNICAS INCOMPLETAS:</b> '+result.missing.map(esc).join(', ')+'. Consumo não inventado.</div>';
-  html+='<div class="foot">Fonte dos envios: histórico das baixas realizadas pela aba Lista. Combinações idênticas são contadas uma única vez. Materiais calculados pelas fichas técnicas.</div></div>';
+  html+='<div class="foot">Fonte dos envios: lotes registrados em ENVIAR PARA COSTURA. Cada envio é um lote; linhas iguais no mesmo lote são consolidadas. Lotes duplicados idênticos são ignorados. Materiais calculados pelas fichas técnicas.</div></div>';
   panel.querySelector('.prod-body').innerHTML=html;
   const sel=panel.querySelector('#report-seamstress');if(sel)sel.onchange=()=>{panel.dataset.reportCostureira=sel.value;render('relatorio')};
   const print=panel.querySelector('#prod-print');if(print)print.onclick=()=>window.print();
