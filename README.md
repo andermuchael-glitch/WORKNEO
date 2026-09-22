@@ -1,17 +1,10 @@
-# Almoxarifado
+# WORKNEO — reconstrução limpa
 
-Aplicativo mobile-first para catalogação de produtos por cor e lançamento acumulado de quantidades em listas/pedidos.
+Fluxo novo:
+1. LISTAS: criar a lista de separação e lançar PRODUTO, QUANT., COR e Nº PEDIDO.
+2. RELATÓRIOS: escolher a lista, costureira e data, selecionar quantidades e gerar/salvar o relatório.
+3. Cada envio é salvo como um relatório independente.
+4. A somatória é calculada a partir dos relatórios salvos por costureira.
+5. O relatório é uma fotografia do envio; a lista é apenas a origem dos dados.
 
-## Fluxo
-- Criar ou continuar uma lista independente.
-- Pesquisar e selecionar produto.
-- Selecionar cor.
-- Lançar várias quantidades; cada lançamento fica no histórico e o total da combinação produto + cor é acumulado.
-- Consultar total por produto, por cor e total geral da lista.
-- Alternar modo claro/escuro.
-- Exportar a lista em CSV e abrir a impressão do navegador para salvar como PDF.
-
-## Cores
-LILÁS, VERDE PALMEIRAS, CELESTE, LARANJA, VERDE ÁGUA, MARROM, CREME, BRANCO, PRETO, ROYAL, MARINHO, VERMELHO, PINK, ROSA BEBÊ, VERDE, AMARELO e BEGE.
-
-A integração direta com Google Sheets será adicionada em uma etapa posterior, pois exige configuração de acesso à conta Google.
+Não há módulos antigos de costura/relatórios neste projeto.
