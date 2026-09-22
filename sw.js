@@ -1,4 +1,4 @@
-const CACHE = 'almoxarifado-v7';
+const CACHE = 'almoxarifado-v8';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
