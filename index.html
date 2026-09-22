@@ -8,17 +8,24 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <link rel="manifest" href="./manifest.webmanifest?v=20260918-01" />
-    <link rel="icon" href="./icon.svg?v=20260918-01" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260922-02" />
+    <link rel="icon" href="./icon.svg?v=20260922-02" type="image/svg+xml" />
     <title>Almoxarifado</title>
     <style>body{margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#172033}.boot{min-height:100vh;display:grid;place-items:center;text-align:center}.boot-card{padding:32px}.boot-icon{font-size:52px}.boot h1{margin:10px 0 6px}.boot p{color:#667085}.list-card{position:relative}</style>
     <script>
-      window.addEventListener('error', function(e){
-        var r=document.getElementById('root');
-        if(r && r.querySelector('.boot')){
-          r.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;font-family:Arial;padding:24px;text-align:center"><div><div style="font-size:48px">⚠️</div><h2>Erro ao carregar o WORKNEO</h2><p>Atualize esta página. Se o problema continuar, abra o console do navegador.</p></div></div>';
+      (function(){
+        var failed=false;
+        function showError(message){
+          if(failed)return;
+          var r=document.getElementById('root');
+          if(!r || !r.querySelector('.boot'))return;
+          failed=true;
+          r.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;font-family:Arial;padding:24px;text-align:center"><div><div style="font-size:48px">⚠️</div><h2>Não foi possível iniciar o Almoxarifado</h2><p>'+message+'</p><button onclick="location.reload()" style="padding:12px 20px;border:0;border-radius:10px;background:#1769e0;color:#fff;font-weight:700">TENTAR NOVAMENTE</button></div></div>';
         }
-      });
+        window.addEventListener('error',function(){showError('O aplicativo encontrou um erro ao carregar os arquivos.');});
+        window.addEventListener('unhandledrejection',function(){showError('O aplicativo encontrou um erro durante a inicialização.');});
+        window.setTimeout(function(){showError('O carregamento demorou mais que o esperado. Verifique a conexão e tente novamente.');},15000);
+      })();
     </script>  </head>
   <body>
     <div id="root"><div class="boot"><div class="boot-card"><div class="boot-icon">📦</div><h1>Almoxarifado</h1><p>Carregando aplicativo...</p></div></div></div>
