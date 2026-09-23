@@ -42,8 +42,13 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const rows=useMemo(()=>filterProductionRows(data,filters),[data,filters]);
  const total=rows.reduce((s,r)=>s+r.qty,0);
  const unsentLists=useMemo(()=>{
-   const sent=new Set(rows.map(r=>r.listId));
-   return lists.filter(l=>!sent.has(l.id));
+   // A lista permanece pendente enquanto ainda houver saldo de peças nela.
+   // Isso também cobre listas nunca enviadas e listas enviadas parcialmente.
+   return lists.map(l=>{
+     const remaining=(Array.isArray(l.items)?l.items:[]).reduce((s,x)=>s+Number(x.qty||0),0);
+     const sentQty=rows.filter(r=>r.listId===l.id).reduce((s,r)=>s+Number(r.qty||0),0);
+     return {...l,remaining,sentQty};
+   }).filter(l=>l.remaining>0);
  },[lists,rows]);
  const grouped=useMemo(()=>{const m=new Map();for(const r of rows){const k=r.date+'|'+r.product;const old=m.get(k);if(old)old.qty+=r.qty;else m.set(k,{date:r.date,product:r.product,qty:r.qty})}return[...m.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.product.localeCompare(b.product))},[rows]);
  if(loading&&!data)return <main className="page"><section className="panel"><div className="empty">Carregando acompanhamento...</div></section></main>;
@@ -56,7 +61,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
  <section className="summary-grid" style={{marginBottom:18}}><div className="summary-card"><span>PEÇAS ENVIADAS</span><b>{fmt(total)}</b><small>nos filtros atuais</small></div><div className="summary-card"><span>PRODUTOS</span><b>{new Set(rows.map(r=>r.product)).size}</b><small>produtos encontrados</small></div><div className="summary-card"><span>DIAS DE ENVIO</span><b>{new Set(rows.map(r=>r.date)).size}</b><small>dias com envio</small></div></section>
  <section className="panel"><div className="section-head"><div><h2>📅 PEÇAS POR PRODUTO E DIA DE ENVIO</h2><p>O dia mostrado é a data em que o relatório foi gerado e as peças foram enviadas à costureira.</p></div></div>{grouped.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>QUANTIDADE</th></tr></thead><tbody>{grouped.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada com estes filtros.</div>}</section>
  <section className="panel"><div className="section-head"><div><h2>📋 LISTAS AINDA NÃO ENVIADAS</h2><p>Listas que não possuem nenhum envio dentro dos filtros atuais. A informação é atualizada automaticamente.</p></div></div>
- {unsentLists.length?<div className="table-wrap"><table><thead><tr><th>LISTA</th><th>STATUS</th></tr></thead><tbody>{unsentLists.map(l=><tr key={l.id}><td>{l.name}</td><td><b style={{color:'#d97706'}}>AGUARDANDO ENVIO</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma lista pendente de envio dentro dos filtros atuais.</div>}</section>
+ {unsentLists.length?<div className="table-wrap"><table><thead><tr><th>LISTA</th><th>PEÇAS PENDENTES</th><th>STATUS</th></tr></thead><tbody>{unsentLists.map(l=><tr key={l.id}><td>{l.name}</td><td>{fmt(l.remaining)}</td><td><b style={{color:'#d97706'}}>{l.sentQty>0?'ENVIO PARCIAL':'AGUARDANDO ENVIO'}</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma lista pendente de envio dentro dos filtros atuais.</div>}</section>
  <section className="panel"><div className="section-head"><div><h2>📊 RESUMO POR COSTUREIRA</h2></div></div><div className="summary-grid">{costureiras.map(c=>{const q=rows.filter(r=>r.costureira===c).reduce((s,r)=>s+r.qty,0);return <div className="summary-card" key={c}><span>{c}</span><b>{fmt(q)}</b><small>peças</small></div>})}</div></section></main>
 }
 function App(){
