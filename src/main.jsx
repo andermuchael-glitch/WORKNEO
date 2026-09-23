@@ -252,4 +252,31 @@ return <div className="app"><header className="top"><div><div className="brand">
 <section className="panel"><div className="section-head"><div><h2>🔗 LINK DE ACOMPANHAMENTO DA PRODUÇÃO</h2><p>Crie um link somente para leitura. O visitante poderá filtrar por período, costureira, produto e lista. Atualização automática.</p></div></div><div className="form-grid"><label>TIPO<select value={shareType} onChange={e=>setShareType(e.target.value)}><option value="general">Produção geral</option><option value="list">Uma lista</option><option value="seamstress">Uma costureira</option></select></label><label>LISTA<select disabled={shareType!=='list'} value={shareListId} onChange={e=>setShareListId(e.target.value)}><option value="">Selecione...</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>COSTUREIRA<select disabled={shareType!=='seamstress'} value={shareCostureira} onChange={e=>setShareCostureira(e.target.value)}><option value="">Selecione...</option>{SEAMSTRESSES.map(s=><option key={s}>{s}</option>)}</select></label><label>DATA INICIAL<input type="date" value={shareStartDate} onChange={e=>setShareStartDate(e.target.value)}/></label><label>DATA FINAL<input type="date" value={shareEndDate} onChange={e=>setShareEndDate(e.target.value)}/></label></div><button className="primary large" disabled={shareBusy} onClick={createShareLink}>🔗 {shareBusy?'CRIANDO...':'CRIAR LINK DE ACOMPANHAMENTO'}</button><div className="saved-list" style={{marginTop:16}}>{shareLinks.length===0?<div className="empty">Nenhum link criado.</div>:shareLinks.map(s=><article className="saved" key={s.id}><div><b>{s.share_type==='general'?'Produção geral':s.share_type==='list'?'Lista específica':'Costureira específica'}</b><span>{s.start_date||'início'} → {s.end_date||'sem fim'}{s.costureira?' · '+s.costureira:''}</span><span>{AUTH_REDIRECT_URL+'?acompanhamento='+s.token}</span></div><div className="actions"><button onClick={()=>navigator.clipboard?.writeText(AUTH_REDIRECT_URL+'?acompanhamento='+s.token)}>📋 COPIAR</button>{s.active&&<button className="danger" onClick={()=>revokeShareLink(s.id)}>DESATIVAR</button>}</div></article>)}</div></section><section className="panel"><div className="section-head"><div><h2>SOMATÓRIA POR COSTUREIRA</h2><p>A soma considera todos os relatórios já salvos, sem duplicar o mesmo envio.</p></div></div><div className="summary-grid">{SEAMSTRESSES.map(s=><div className="summary-card" key={s}><span>{s}</span><b>{fmt(totals[s]||0)}</b><small>peças enviadas</small></div>)}</div></section>
 <section className="panel"><div className="section-head"><div><h2>RELATÓRIOS SALVOS</h2><p>Cada envio permanece individual e pode gerar os dois relatórios.</p></div></div>{reports.length===0?<div className="empty">Nenhum relatório salvo.</div>:<div className="saved-list">{reports.map(r=><article className="saved" key={r.id}><div><b>{r.costureira}</b><span>{r.listName} · {fmtDate(r.date)}</span><span>{fmt(r.items.reduce((s,x)=>s+n(x.qty),0))} peças · {r.groupedProducts?.length||groupProducts(r.items).length} produtos agrupados</span></div><div className="actions"><button onClick={()=>printReport(r,'pecas')}>📦 PEÇAS AGRUPADAS</button><button onClick={()=>printReport(r,'materiais')}>🧵 MATERIAIS</button><button className="primary" onClick={()=>printReport(r,'completo')}>📄 COMPLETO</button><button className="danger" onClick={()=>deleteReport(r.id)}>Excluir</button></div><details><summary>Ver produtos enviados</summary><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>Nº PEDIDO</th></tr></thead><tbody>{r.items.map((x,i)=><tr key={i}><td>{x.product}</td><td>{x.qty}</td><td>{x.color}</td><td>{x.pedido||'—'}</td></tr>)}</tbody></table></div></details></article>)}</div>}</section></main>}
 </>}<footer>WORKNEO · ficha técnica baseada na FICHA SEPARAÇÃO 2026 · cálculo no relatório</footer></div>}
-createRoot(document.getElementById('root')).render(<App/>);
+function PublicShareEntry(){
+ const token=new URLSearchParams(window.location.search).get('acompanhamento')||'';
+ const [data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const [filters,setFilters]=useState({startDate:'',endDate:'',costureira:'',product:'',listId:''});
+ useEffect(()=>{
+   if(!token){setError('Link de acompanhamento não informado.');setLoading(false);return}
+   if(!isSupabaseConfigured||!supabase){setError('O acompanhamento online não está configurado neste ambiente.');setLoading(false);return}
+   let alive=true;
+   const load=async()=>{
+     try{
+       const result=await loadPublicProductionShare(token);
+       if(!alive)return;
+       setData(result);setError('');
+     }catch(e){
+       console.error('WORKNEO acompanhamento:',e);
+       if(alive)setError(e?.message||'Não foi possível carregar este acompanhamento.');
+     }finally{
+       if(alive)setLoading(false);
+     }
+   };
+   load();
+   const timer=setInterval(load,5000);
+   return()=>{alive=false;clearInterval(timer)};
+ },[token]);
+ return <PublicShare data={data} loading={loading} error={error} filters={filters} setFilters={setFilters}/>;
+}
+const hasPublicShare=new URLSearchParams(window.location.search).has('acompanhamento');
+createRoot(document.getElementById('root')).render(hasPublicShare?<PublicShareEntry/>:<App/>);
