@@ -44,7 +44,7 @@ begin
   if p_share_type not in ('general','list','seamstress') then raise exception 'Tipo de compartilhamento inválido'; end if;
   if p_share_type='list' and p_list_id is null then raise exception 'Informe a lista'; end if;
   if p_share_type='seamstress' and p_costureira is null then raise exception 'Informe a costureira'; end if;
-  v_token=encode(gen_random_bytes(24),'hex');
+  v_token=encode(extensions.gen_random_bytes(24),'hex');
   insert into public.workneo_shares(owner_user_id,share_token,share_type,list_id,costureira,start_date,end_date)
   values(auth.uid(),v_token,p_share_type,p_list_id,p_costureira,p_start_date,p_end_date)
   returning id into v_id;
