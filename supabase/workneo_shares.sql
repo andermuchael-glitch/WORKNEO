@@ -34,7 +34,7 @@ create or replace function public.create_workneo_share(
 ) returns jsonb
 language plpgsql
 security definer
-set search_path=public
+set search_path=''
 as $$
 declare
   v_id uuid;
@@ -56,7 +56,7 @@ create or replace function public.list_workneo_shares()
 returns jsonb
 language sql
 security definer
-set search_path=public
+set search_path=''
 as $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',s.id,'token',s.share_token,'share_type',s.share_type,'list_id',s.list_id,
@@ -71,7 +71,7 @@ create or replace function public.revoke_workneo_share(p_share_id uuid)
 returns boolean
 language sql
 security definer
-set search_path=public
+set search_path=''
 as $$
   update public.workneo_shares set active=false
   where id=p_share_id and owner_user_id=auth.uid()
@@ -82,7 +82,7 @@ create or replace function public.get_workneo_share(p_token text)
 returns jsonb
 language plpgsql
 security definer
-set search_path=public
+set search_path=''
 as $$
 declare
   s public.workneo_shares;
