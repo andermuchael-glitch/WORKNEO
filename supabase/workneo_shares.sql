@@ -118,7 +118,7 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object('id',l->>'id','name',l->>'name')),'[]'::jsonb)
   into v_lists
   from jsonb_array_elements(coalesce(d.lists,'[]'::jsonb)) l
-  where exists (select 1 from jsonb_array_elements(v_reports) rr where rr->>'listId'=l->>'id');
+  where (s.share_type<>'list' or l->>'id'=s.list_id);
 
   return jsonb_build_object(
     'share',jsonb_build_object('share_type',s.share_type,'list_id',s.list_id,'costureira',s.costureira,'start_date',s.start_date,'end_date',s.end_date),
