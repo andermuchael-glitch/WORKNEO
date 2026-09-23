@@ -42,4 +42,15 @@ using (auth.uid() = user_id);
 grant select, insert, update, delete on public.workneo_data to authenticated;
 
 -- Necessário para sincronização em tempo real PC ↔ Android.
-alter publication supabase_realtime add table public.workneo_data;
+do $
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'workneo_data'
+  ) then
+    alter publication supabase_realtime add table public.workneo_data;
+  end if;
+end $;
