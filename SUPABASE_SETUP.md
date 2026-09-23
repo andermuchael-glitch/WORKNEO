@@ -12,7 +12,8 @@ A tabela usa Row Level Security para que cada conta só consiga ler e alterar a 
 Crie as variáveis de build:
 
 `VITE_SUPABASE_URL` = URL do projeto Supabase  
-`VITE_SUPABASE_PUBLISHABLE_KEY` = chave publishable/anon do projeto
+`VITE_SUPABASE_PUBLISHABLE_KEY` = chave publishable/anon do projeto  
+`VITE_AUTH_REDIRECT_URL` = `https://andermuchael-glitch.github.io/WORKNEO/`
 
 Para desenvolvimento local, coloque-as em `.env.local`.
 
@@ -26,7 +27,7 @@ Com a integração configurada, o WORKNEO mostra a tela de login.
 - **Esqueci a senha** envia o fluxo de recuperação por e-mail.
 - A sessão fica persistida.
 
-Na primeira entrada, se a conta ainda não possuir dados na nuvem, o WORKNEO envia os dados locais existentes para a nuvem. Se a conta já tiver dados, a nuvem é carregada como fonte principal e o cache local é atualizado.
+Na primeira entrada, se a conta ainda não possuir dados na nuvem, o WORKNEO envia os dados locais existentes para a nuvem. Se a conta já tiver dados, a nuvem é carregada como fonte principal e o cache local é atualizado. Se a conta tiver uma linha vazia na nuvem e houver dados locais, os dados locais são preservados e enviados para a nuvem, evitando perda na primeira migração.
 
 ## 4. Backup JSON
 Os botões `⬇ BACKUP` e `⬆ RESTAURAR` continuam funcionando. O backup JSON é independente da nuvem e permanece compatível com a estrutura atual do WORKNEO.
@@ -35,3 +36,9 @@ Os botões `⬇ BACKUP` e `⬆ RESTAURAR` continuam funcionando. O backup JSON �
 Cada alteração salva no WORKNEO é enviada automaticamente para a nuvem. O outro dispositivo recebe alterações pelo Supabase Realtime e atualiza as listas/relatórios sem precisar importar JSON.
 
 A chave publishable/anon pode ficar no frontend quando as tabelas estão protegidas por RLS; nunca coloque a service-role/secret key no aplicativo.
+
+## 6. URL de autenticação
+No Supabase, em Authentication → URL Configuration, use como Site URL e Redirect URL de produção:
+`https://andermuchael-glitch.github.io/WORKNEO/`
+
+O WORKNEO usa essa URL para confirmação de e-mail e recuperação de senha, inclusive quando o fluxo é iniciado no APK Android.
