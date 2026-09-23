@@ -69,18 +69,29 @@ useEffect(()=>{
   loadCloudData(session.user.id).then(async cloud=>{
     if(!alive)return;
     if(cloud){
-      skipNextSyncRef.current=true;
-      lastCloudUpdateRef.current=cloud.updated_at||'';
       const cloudLists=Array.isArray(cloud.lists)?cloud.lists:[];
       const cloudReports=Array.isArray(cloud.reports)?cloud.reports:[];
-      setLists(cloudLists);write(LISTS_KEY,cloudLists);
-      setReports(cloudReports);write(REPORTS_KEY,cloudReports);
-      setSyncStatus('sincronizado');
+      const cloudHasData=cloudLists.length>0||cloudReports.length>0;
+      const localHasData=lists.length>0||reports.length>0;
+      if(!cloudHasData&&localHasData){
+        const created=await saveCloudData(session.user.id,lists,reports);
+        if(!alive)return;
+        lastCloudUpdateRef.current=created.updated_at||'';
+        setSyncStatus('sincronizado');
+        setMessage('Dados locais encontrados e enviados para a nuvem.');
+      }else{
+        skipNextSyncRef.current=true;
+        lastCloudUpdateRef.current=cloud.updated_at||'';
+        setLists(cloudLists);write(LISTS_KEY,cloudLists);
+        setReports(cloudReports);write(REPORTS_KEY,cloudReports);
+        setSyncStatus('sincronizado');
+      }
     }else{
       const created=await saveCloudData(session.user.id,lists,reports);
       if(!alive)return;
       lastCloudUpdateRef.current=created.updated_at||'';
       setSyncStatus('sincronizado');
+      if(lists.length||reports.length)setMessage('Dados locais encontrados e enviados para a nuvem.');
     }
     cloudReadyRef.current=true;
   }).catch(error=>{
