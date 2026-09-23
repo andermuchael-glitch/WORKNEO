@@ -1,10 +1,11 @@
-import React,{useMemo,useState}from'react';
+import React,{useEffect,useMemo,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import{Capacitor}from'@capacitor/core';
 import{Filesystem,Directory}from'@capacitor/filesystem';
 import{FileOpener}from'@capacitor-community/file-opener';
 import html2pdf from'html2pdf.js';
 import{MATERIAL_RULES}from'./materialRules.js';
+import{isSupabaseConfigured,supabase,loadCloudData,saveCloudData,subscribeToCloud}from'./supabaseClient.js';
 import'./styles.css';
 
 const PRODUCTS=["PORTA GARRAFA LITRÃO","PORTA GARRAFA 600","PORTA GARRAFA 600 SEM ZÍPER","PORTA ÁGUA E ISOTÔNICO","BOLSA DE MÃO","BOLSA MEIA LUA","BARMAT","BARMAT GRANDE","LANCHEIRA","BOLSA FEMININA","CASE CELULAR","CASE NOTEBOOK","CORRENTE PARA ÓCULOS","CASE TABLET","CARTEIRA FEMININA","COOLER TÉRMICO LATERAL","PORTA ESPUMANTE 975ML","ESTOJO","PORTA GARRAFA LONG NECK 355ML","LIXEIRA AUTOMOTIVA","PORTA LATA 350ML","PORTA LATA 473ML","PORTA LATA PALITO 269ML","PORTA LATA PALITO 350ML","KIT LUVA DE FORNO","MÁSCARA PROTETORA","MATEIRA","MATEIRA PEQUENA","MINI BAG GRANDE LATERAL","PORTA MOEDAS","MOCHILA INFANTIL","MOCHILA TÉRMICA","MOUSE PAD","MOUSE PAD GAMER","MUNHEQUEIRA","NECESSAIRE","NECESSAIRE GRANDE","POCHETE","PORTA COPOS","PROTETOR FACIAL","PORTA ÓCULOS","PORTA SQUEEZE","PORTA VINHO DUPLO","PORTA VINHO DUPLO C/ PORTA TAÇAS","PORTA VINHO SIMPLES","MOCHILA TRANSVERSAL","MINI BAG PEQUENA TRANSVERSAL","TAG PARA MALA","COOLER TÉRMICO GRANDE","COOLER TÉRMICO PEQUENO","TAPA OLHO","VISEIRA","LATA CAMISA","LONG CAMISA","CANGA DE PRAIA","CANGA DE PRAIA G","MARMITEIRA IMPERMEÁVEL","MOCHILA IMPERMEÁVEL","VISEIRA TURBANTE","ESTEIRA DE PRAIA","WINE CASE DELUXE","WINE BAG"];
@@ -35,10 +36,142 @@ const matrixHtml=(materials,title)=>{const rows=materialRows(materials,x=>!NO_CO
 const simpleMaterialHtml=(materials,title,fn)=>{const rows=materialRows(materials,fn);if(!rows.length)return'<h3>'+title+'</h3><p>Nenhum material.</p>';const map=new Map();for(const x of rows){const k=x.material+'|'+x.unit;let g=map.get(k);if(!g)g={material:x.material,unit:x.unit,specs:new Set(),qty:0};if(x.spec)g.specs.add(x.spec);g.qty+=x.qty;map.set(k,g)}const body=[...map.values()].map(g=>'<tr><td>'+g.material+'</td><td>'+[...g.specs].join(' · ')+'</td><td>'+fmt(g.qty)+' '+g.unit+'</td></tr>').join('');return'<h3>'+title+'</h3><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>TOTAL</th></tr></thead><tbody>'+body+'</tbody></table>';};
 function App(){
 const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>read(LISTS_KEY)),[reports,setReports]=useState(()=>read(REPORTS_KEY));
+const[session,setSession]=useState(null),[authLoading,setAuthLoading]=useState(isSupabaseConfigured),[authMode,setAuthMode]=useState('login'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authBusy,setAuthBusy]=useState(false),[syncStatus,setSyncStatus]=useState(isSupabaseConfigured?'aguardando login':'local');
+const cloudReadyRef=useRef(false),skipNextSyncRef=useRef(false),syncTimerRef=useRef(null),lastCloudUpdateRef=useRef('');
 const[selectedListId,setSelectedListId]=useState(''),[listName,setListName]=useState(''),[item,setItem]=useState({product:'',qty:'',color:'',pedido:''});
 const[reportListId,setReportListId]=useState(''),[costureira,setCostureira]=useState(''),[reportDate,setReportDate]=useState(today()),[sendQty,setSendQty]=useState({}),[message,setMessage]=useState('');
 const currentList=lists.find(x=>x.id===selectedListId)||null,reportList=lists.find(x=>x.id===reportListId)||null;
 const saveLists=v=>{setLists(v);write(LISTS_KEY,v)},saveReports=v=>{setReports(v);write(REPORTS_KEY,v)};
+
+useEffect(()=>{
+  if(!isSupabaseConfigured||!supabase){
+    setAuthLoading(false);
+    return;
+  }
+  let alive=true;
+  supabase.auth.getSession().then(({data,error})=>{
+    if(!alive)return;
+    if(error) setMessage?.(''); 
+    setSession(data?.session||null);
+    setAuthLoading(false);
+  });
+  const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,nextSession)=>{
+    if(alive) setSession(nextSession);
+  });
+  return()=>{alive=false;subscription.unsubscribe()};
+},[]);
+
+useEffect(()=>{
+  if(!isSupabaseConfigured||!supabase||!session?.user?.id)return;
+  let alive=true;
+  cloudReadyRef.current=false;
+  setSyncStatus('sincronizando');
+  loadCloudData(session.user.id).then(async cloud=>{
+    if(!alive)return;
+    if(cloud){
+      skipNextSyncRef.current=true;
+      lastCloudUpdateRef.current=cloud.updated_at||'';
+      const cloudLists=Array.isArray(cloud.lists)?cloud.lists:[];
+      const cloudReports=Array.isArray(cloud.reports)?cloud.reports:[];
+      setLists(cloudLists);write(LISTS_KEY,cloudLists);
+      setReports(cloudReports);write(REPORTS_KEY,cloudReports);
+      setSyncStatus('sincronizado');
+    }else{
+      const created=await saveCloudData(session.user.id,lists,reports);
+      if(!alive)return;
+      lastCloudUpdateRef.current=created.updated_at||'';
+      setSyncStatus('sincronizado');
+    }
+    cloudReadyRef.current=true;
+  }).catch(error=>{
+    console.error(error);
+    if(alive){
+      cloudReadyRef.current=true;
+      setSyncStatus('offline');
+      setMessage('Não foi possível acessar a nuvem. O WORKNEO continua usando os dados locais.');
+    }
+  });
+  return()=>{alive=false;cloudReadyRef.current=false};
+},[session]);
+
+useEffect(()=>{
+  if(!session?.user?.id||!cloudReadyRef.current||!isSupabaseConfigured)return;
+  if(skipNextSyncRef.current){
+    skipNextSyncRef.current=false;
+    return;
+  }
+  clearTimeout(syncTimerRef.current);
+  setSyncStatus('salvando...');
+  syncTimerRef.current=setTimeout(async()=>{
+    try{
+      const saved=await saveCloudData(session.user.id,lists,reports);
+      lastCloudUpdateRef.current=saved.updated_at||'';
+      setSyncStatus('sincronizado');
+    }catch(error){
+      console.error(error);
+      setSyncStatus('offline');
+      setMessage('Alteração salva no aparelho, mas não foi possível sincronizar agora.');
+    }
+  },650);
+  return()=>clearTimeout(syncTimerRef.current);
+},[lists,reports,session]);
+
+useEffect(()=>{
+  if(!session?.user?.id||!isSupabaseConfigured)return;
+  return subscribeToCloud(session.user.id,payload=>{
+    if(!payload||payload.user_id!==session.user.id)return;
+    if(payload.updated_at&&payload.updated_at===lastCloudUpdateRef.current)return;
+    skipNextSyncRef.current=true;
+    lastCloudUpdateRef.current=payload.updated_at||'';
+    const cloudLists=Array.isArray(payload.lists)?payload.lists:[];
+    const cloudReports=Array.isArray(payload.reports)?payload.reports:[];
+    setLists(cloudLists);write(LISTS_KEY,cloudLists);
+    setReports(cloudReports);write(REPORTS_KEY,cloudReports);
+    setSyncStatus('sincronizado');
+  },status=>{
+    if(status==='SUBSCRIBED')setSyncStatus('sincronizado');
+  });
+},[session]);
+
+const handleAuth=async e=>{
+  e.preventDefault();
+  if(!supabase||!authEmail.trim()||authPassword.length<6){
+    setMessage('Informe um e-mail e uma senha com pelo menos 6 caracteres.');
+    return;
+  }
+  setAuthBusy(true);
+  try{
+    if(authMode==='signup'){
+      const{data,error}=await supabase.auth.signUp({email:authEmail.trim(),password:authPassword,options:{emailRedirectTo:window.location.origin+window.location.pathname}});
+      if(error)throw error;
+      if(data.session)setMessage('Conta criada e conectada.');
+      else setMessage('Conta criada. Verifique o e-mail para confirmar o acesso.');
+    }else{
+      const{error}=await supabase.auth.signInWithPassword({email:authEmail.trim(),password:authPassword});
+      if(error)throw error;
+      setMessage('Login realizado. Sincronizando seus dados...');
+    }
+  }catch(error){
+    console.error(error);
+    setMessage(error?.message||'Não foi possível concluir o login.');
+  }finally{setAuthBusy(false)}
+};
+
+const resetPassword=async()=>{
+  if(!supabase||!authEmail.trim()){setMessage('Informe seu e-mail para recuperar a senha.');return}
+  setAuthBusy(true);
+  try{
+    const{error}=await supabase.auth.resetPasswordForEmail(authEmail.trim(),{redirectTo:window.location.origin+window.location.pathname});
+    if(error)throw error;
+    setMessage('Se o e-mail estiver cadastrado, o link de recuperação será enviado.');
+  }catch(error){setMessage(error?.message||'Não foi possível enviar a recuperação.')}finally{setAuthBusy(false)}
+};
+
+const logout=async()=>{
+  if(supabase)await supabase.auth.signOut();
+  setSession(null);
+  setSyncStatus(isSupabaseConfigured?'aguardando login':'local');
+};
 const createList=()=>{const name=listName.trim()||'Lista '+new Date().toLocaleDateString('pt-BR'),l={id:uid(),name,createdAt:new Date().toISOString(),items:[]},v=[...lists,l];saveLists(v);setSelectedListId(l.id);setReportListId(l.id);setListName('');setMessage('Lista criada.')};
 const addItem=()=>{if(!selectedListId||!item.product||n(item.qty)<=0){setMessage('Escolha a lista, o produto e uma quantidade maior que zero.');return}saveLists(lists.map(l=>l.id!==selectedListId?l:{...l,items:[...l.items,{id:uid(),product:item.product,qty:n(item.qty),color:item.color||'SEM COR',pedido:String(item.pedido||'').trim()}]}));setItem({product:'',qty:'',color:'',pedido:''});setMessage('Item adicionado à lista.')};
 const removeItem=id=>saveLists(lists.map(l=>l.id!==selectedListId?l:{...l,items:l.items.filter(x=>x.id!==id)}));
@@ -47,12 +180,14 @@ const totalReport=reportList?reportList.items.reduce((s,x)=>s+Math.min(n(sendQty
 const totals=useMemo(()=>{const m={};for(const r of reports)m[r.costureira]=(m[r.costureira]||0)+r.items.reduce((s,x)=>s+n(x.qty),0);return m},[reports]);
 const printReport=async(r,mode='completo')=>{const grouped=r.groupedProducts||groupProducts(r.items||[]),materials=r.materials||calculateMaterials(r.items||[]);const productsHtml='<h2>1. PRODUTOS AGRUPADOS NO ENVIO</h2><table><thead><tr><th>PRODUTO</th><th>QUANTIDADE</th><th>CORES</th><th>Nº PEDIDOS</th></tr></thead><tbody>'+grouped.map(x=>'<tr><td>'+x.product+'</td><td>'+fmt(x.qty)+'</td><td>'+x.colors.join(', ')+'</td><td>'+x.orders.join(', ')||'—'+'</td></tr>').join('')+'</tbody></table><div class="total">TOTAL DE PEÇAS: '+fmt((r.items||[]).reduce((s,x)=>s+n(x.qty),0))+'</div>';const materialsHtml='<h2>2. MATERIAIS PARA COSTURA</h2>'+matrixHtml(materials,'MATERIAIS POR COR')+simpleMaterialHtml(materials,'FERRAGENS E REGULADORES',x=>HARDWARE.has(norm(x.material).toLowerCase()))+simpleMaterialHtml(materials,'MATERIAIS SEM COR',x=>NO_COLOR.has(norm(x.material).toLowerCase()));const html='<!doctype html><html><head><meta charset="utf-8"><title>WORKNEO · Relatório</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;color:#172033;font-size:11px;background:#fff;padding-top:54px}.report-actions{position:fixed;top:0;left:0;right:0;z-index:9999;display:flex;justify-content:flex-end;gap:8px;padding:9px 12px;background:#14213d;box-shadow:0 2px 8px #0002}.report-actions button{border:0;border-radius:7px;padding:9px 14px;font-weight:800;font-size:12px;cursor:pointer}.close-report{background:#fff;color:#14213d}h1{font-size:21px;margin:0 0 4px;color:#14213d;border-bottom:4px solid #1769e0;padding-bottom:8px}h2{font-size:14px;margin:20px 0 7px;color:#1769e0;background:#eef5ff;border-left:5px solid #1769e0;padding:7px 9px;border-radius:4px}h3{font-size:12px;margin:14px 0 6px;color:#14213d}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;margin:12px 0 16px}.meta div{border:1px solid #d7e1ef;background:#f7faff;border-radius:6px;padding:7px 9px}.meta b{color:#1769e0;font-size:9px;letter-spacing:.04em}table{width:100%;border-collapse:separate;border-spacing:0;margin:5px 0 12px;border:1px solid #cfd9e7;border-radius:6px;overflow:hidden}th,td{border-right:1px solid #dbe3ed;border-bottom:1px solid #dbe3ed;padding:6px 7px;text-align:left}th{background:#14213d;color:#fff;font-size:9px;letter-spacing:.03em}tr:nth-child(even) td{background:#f7faff}tr:last-child td{border-bottom:0}th:last-child,td:last-child{border-right:0}td:nth-child(n+2){text-align:center}.total{font-weight:800;font-size:13px;margin:7px 0;padding:8px 10px;background:#eaf3ff;border-radius:6px;color:#14213d}.note{font-size:9px;color:#64748b;margin-top:15px;border-top:1px solid #dbe3ed;padding-top:8px}.print-only{display:block}</style></head><body><div class="report-actions"><button class="close-report" onclick="try{window.close()}catch(e){};setTimeout(function(){if(!window.closed){history.back()}},150)">✕ FECHAR RELATÓRIO</button></div><h1>WORKNEO · RELATÓRIO DE MATERIAIS PARA COSTURA</h1><div class="meta"><div><b>COSTUREIRA</b><br>'+r.costureira+'</div><div><b>LISTA</b><br>'+r.listName+'</div><div><b>DATA DA SEPARAÇÃO</b><br>'+fmtDate(r.date)+'</div><div><b>QUANTIDADE DE PEÇAS</b><br>'+fmt((r.items||[]).reduce((s,x)=>s+n(x.qty),0))+'</div></div>'+(mode==='pecas'?productsHtml:mode==='materiais'?materialsHtml:productsHtml+materialsHtml)+'<div class="note">Materiais calculados exclusivamente a partir das fichas técnicas da planilha FICHA SEPARAÇÃO 2026. A cor não encontrada na ficha usa a mesma regra técnica do produto, pois o processo de fabricação permanece o mesmo.</div></body></html>';if(Capacitor.isNativePlatform()){try{setMessage('Gerando PDF...');const holder=document.createElement('div');const parsed=new DOMParser().parseFromString(html,'text/html');const style=document.createElement('style');style.textContent=Array.from(parsed.querySelectorAll('style')).map(x=>x.textContent).join('\\n');holder.appendChild(style);const content=document.createElement('div');content.innerHTML=parsed.body.innerHTML;holder.appendChild(content);holder.style.position='fixed';holder.style.left='-100000px';holder.style.top='0';holder.style.width='277mm';holder.style.background='#fff';document.body.appendChild(holder);const blob=await html2pdf().set({margin:[8,8,8,8],filename:'WORKNEO-relatorio.pdf',image:{type:'jpeg',quality:.96},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}}).from(content).outputPdf('blob');holder.remove();const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob)});const fileName='WORKNEO-relatorio-'+Date.now()+'.pdf';const written=await Filesystem.writeFile({path:fileName,data:base64,directory:Directory.Cache});const uri=(await Filesystem.getUri({directory:Directory.Cache,path:fileName})).uri;await FileOpener.open({filePath:uri,contentType:'application/pdf',openWithDefault:false});setMessage('PDF pronto. Escolha o aplicativo para abrir.')}catch(e){console.error(e);setMessage('Não foi possível abrir o PDF.');}}else{const w=window.open('','_blank');if(!w){setMessage('Permita pop-ups para imprimir.');return}w.document.write(html);w.document.close();w.focus();setTimeout(()=>w.print(),250)}};
 const deleteReport=id=>{if(confirm('Apagar este relatório salvo?'))saveReports(reports.filter(r=>r.id!==id))};
-return <div className="app"><header className="top"><div><div className="brand">WORKNEO</div><div className="subtitle">Lista → Relatório → Materiais → Costura</div></div><div className="top-actions"><div className="status">Ficha técnica ativa</div><button className="backup-btn" onClick={()=>downloadBackup(lists,reports,setMessage)}>⬇ BACKUP</button><label className="backup-btn backup-import">⬆ RESTAURAR<input type="file" accept=".json,application/json" onChange={e=>{importBackup(e.target.files?.[0],saveLists,saveReports,setMessage);e.target.value=''}}/></label></div></header>
-<nav className="tabs"><button className={tab==='listas'?'active':''} onClick={()=>setTab('listas')}>📋 LISTAS</button><button className={tab==='relatorios'?'active':''} onClick={()=>setTab('relatorios')}>📄 RELATÓRIOS</button></nav>
+return <div className="app"><header className="top"><div><div className="brand">WORKNEO</div><div className="subtitle">Lista → Relatório → Materiais → Costura</div></div><div className="top-actions"><div className="status">{isSupabaseConfigured?(session?'☁ '+(session.user.email||'conta conectada'):'☁ login necessário'):'☁ nuvem não configurada'}</div><div className="status">● {syncStatus}</div><button className="backup-btn" onClick={()=>downloadBackup(lists,reports,setMessage)}>⬇ BACKUP</button><label className="backup-btn backup-import">⬆ RESTAURAR<input type="file" accept=".json,application/json" onChange={e=>{importBackup(e.target.files?.[0],saveLists,saveReports,setMessage);e.target.value=''}}/></label>{session&&<button className="backup-btn" onClick={logout}>SAIR</button>}</div></header>
+{isSupabaseConfigured&&!authLoading&&!session?<section className="auth-panel"><div className="auth-card"><div className="auth-logo">WORKNEO</div><h2>{authMode==='signup'?'Criar conta':'Entrar no WORKNEO'}</h2><p>Use a mesma conta no computador e no Android para manter listas e relatórios sincronizados na nuvem.</p><form onSubmit={handleAuth}><input type="email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="Seu e-mail" autoComplete="email"/><input type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="Senha" autoComplete={authMode==='signup'?'new-password':'current-password'}/><button className="primary" disabled={authBusy}>{authBusy?'AGUARDE...':authMode==='signup'?'CRIAR CONTA':'ENTRAR'}</button></form><div className="auth-links">{authMode==='login'?<><button onClick={()=>setAuthMode('signup')}>Criar nova conta</button><button onClick={resetPassword}>Esqueci minha senha</button></>:<button onClick={()=>setAuthMode('login')}>Já tenho uma conta</button>}</div><div className="auth-note">O backup JSON continua disponível como cópia independente.</div></div></section>:null}
+{!isSupabaseConfigured||session?<nav className="tabs"><button className={tab==='listas'?'active':''} onClick={()=>setTab('listas')}>📋 LISTAS</button><button className={tab==='relatorios'?'active':''} onClick={()=>setTab('relatorios')}>📄 RELATÓRIOS</button></nav>:null}
+{isSupabaseConfigured&&authLoading?<div className="auth-loading">Carregando sessão...</div>:null}
 {message&&<div className="message" onClick={()=>setMessage('')}>{message}</div>}
-{tab==='listas'&&<main className="page"><section className="panel"><div className="section-head"><div><h2>LISTA DE SEPARAÇÃO</h2><p>A lista recebe os produtos do pedido. O cálculo de materiais acontece somente no Relatório.</p></div></div><div className="create-row"><input value={listName} onChange={e=>setListName(e.target.value)} placeholder="Nome da lista (ex.: 11207 espaço luz)"/><button onClick={createList}>+ NOVA LISTA</button></div><div className="list-grid">{lists.length===0?<div className="empty">Nenhuma lista criada.</div>:lists.map(l=><button key={l.id} className={'list-card '+(selectedListId===l.id?'selected':'')} onClick={()=>{setSelectedListId(l.id);setReportListId(l.id)}}><b>{l.name}</b><span>{l.items.length} linhas · {fmt(l.items.reduce((s,x)=>s+n(x.qty),0))} peças</span></button>)}</div></section>
+{(!isSupabaseConfigured||session)&&tab==='listas'&&<main className="page"><section className="panel"><div className="section-head"><div><h2>LISTA DE SEPARAÇÃO</h2><p>A lista recebe os produtos do pedido. O cálculo de materiais acontece somente no Relatório.</p></div></div><div className="create-row"><input value={listName} onChange={e=>setListName(e.target.value)} placeholder="Nome da lista (ex.: 11207 espaço luz)"/><button onClick={createList}>+ NOVA LISTA</button></div><div className="list-grid">{lists.length===0?<div className="empty">Nenhuma lista criada.</div>:lists.map(l=><button key={l.id} className={'list-card '+(selectedListId===l.id?'selected':'')} onClick={()=>{setSelectedListId(l.id);setReportListId(l.id)}}><b>{l.name}</b><span>{l.items.length} linhas · {fmt(l.items.reduce((s,x)=>s+n(x.qty),0))} peças</span></button>)}</div></section>
 {currentList&&<section className="panel"><div className="section-head"><div><h2>{currentList.name}</h2><p>PRODUTO · QUANT. · COR · Nº PEDIDO</p></div><div className="big-number">{fmt(currentList.items.reduce((s,x)=>s+n(x.qty),0))}<small>peças</small></div></div><div className="form-grid"><label>PRODUTO<select value={item.product} onChange={e=>setItem({...item,product:e.target.value})}><option value="">Selecione...</option>{PRODUCTS.map(p=><option key={p}>{p}</option>)}</select></label><label>QUANTIDADE<input type="number" min="1" value={item.qty} onChange={e=>setItem({...item,qty:e.target.value})}/></label><label>COR<select value={item.color} onChange={e=>setItem({...item,color:e.target.value})}><option value="">Selecione...</option>{COLORS.map(c=><option key={c}>{c}</option>)}</select></label><label>Nº PEDIDO<input value={item.pedido} onChange={e=>setItem({...item,pedido:e.target.value})} placeholder="Ex.: 11207"/></label></div><button className="primary" onClick={addItem}>+ ADICIONAR À LISTA</button><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QUANT.</th><th>COR</th><th>Nº PEDIDO</th><th></th></tr></thead><tbody>{currentList.items.length?currentList.items.map(x=><tr key={x.id}><td>{x.product}</td><td>{x.qty}</td><td>{x.color}</td><td>{x.pedido||'—'}</td><td><button className="danger" onClick={()=>removeItem(x.id)}>Excluir</button></td></tr>):<tr><td colSpan="5" className="empty">Esta lista ainda não possui itens.</td></tr>}</tbody></table></div></section>}</main>}
-{tab==='relatorios'&&<main className="page"><section className="panel"><div className="section-head"><div><h2>GERAR RELATÓRIO A PARTIR DA LISTA</h2><p>Escolha a lista, a costureira e o envio. A ficha técnica calcula automaticamente zíperes, etiquetas, fitas, linhas e demais materiais.</p></div></div><div className="form-grid"><label>LISTA<select value={reportListId} onChange={e=>{setReportListId(e.target.value);setSendQty({})}}><option value="">Selecione a lista...</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>COSTUREIRA<select value={costureira} onChange={e=>setCostureira(e.target.value)}><option value="">Selecione...</option>{SEAMSTRESSES.map(s=><option key={s}>{s}</option>)}</select></label><label>DATA DO ENVIO<input type="date" value={reportDate} onChange={e=>setReportDate(e.target.value)}/></label></div>{reportList?<><div className="hint">Você pode misturar cores e números de pedido. Na hora do relatório, produtos iguais são agrupados; a ficha técnica é aplicada por produto. Uma cor nova continua usando a mesma ficha do produto.</div><div className="table-wrap"><table><thead><tr><th>ENVIAR</th><th>PRODUTO</th><th>DISPONÍVEL</th><th>QTD. ENVIO</th><th>COR</th><th>Nº PEDIDO</th></tr></thead><tbody>{reportList.items.length?reportList.items.map(x=><tr key={x.id}><td><input className="check" type="checkbox" checked={n(sendQty[x.id])>0} onChange={e=>setSendQty({...sendQty,[x.id]:e.target.checked?x.qty:0})}/></td><td>{x.product}</td><td>{x.qty}</td><td><input className="qty" type="number" min="0" max={x.qty} value={sendQty[x.id]??0} onChange={e=>setSendQty({...sendQty,[x.id]:Math.min(n(e.target.value),x.qty)})}/></td><td>{x.color}</td><td>{x.pedido||'—'}</td></tr>):<tr><td colSpan="6" className="empty">A lista está sem saldo para envio.</td></tr>}</tbody></table></div><div className="report-total">QUANTIDADE DE PEÇAS: <b>{fmt(totalReport)}</b></div><button className="primary large" onClick={generateReport}>📄 GERAR E SALVAR RELATÓRIO</button></>:<div className="empty">Escolha uma lista para carregar os itens.</div>}</section>
+{(!isSupabaseConfigured||session)&&tab==='relatorios'&&<main className="page"><section className="panel"><div className="section-head"><div><h2>GERAR RELATÓRIO A PARTIR DA LISTA</h2><p>Escolha a lista, a costureira e o envio. A ficha técnica calcula automaticamente zíperes, etiquetas, fitas, linhas e demais materiais.</p></div></div><div className="form-grid"><label>LISTA<select value={reportListId} onChange={e=>{setReportListId(e.target.value);setSendQty({})}}><option value="">Selecione a lista...</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>COSTUREIRA<select value={costureira} onChange={e=>setCostureira(e.target.value)}><option value="">Selecione...</option>{SEAMSTRESSES.map(s=><option key={s}>{s}</option>)}</select></label><label>DATA DO ENVIO<input type="date" value={reportDate} onChange={e=>setReportDate(e.target.value)}/></label></div>{reportList?<><div className="hint">Você pode misturar cores e números de pedido. Na hora do relatório, produtos iguais são agrupados; a ficha técnica é aplicada por produto. Uma cor nova continua usando a mesma ficha do produto.</div><div className="table-wrap"><table><thead><tr><th>ENVIAR</th><th>PRODUTO</th><th>DISPONÍVEL</th><th>QTD. ENVIO</th><th>COR</th><th>Nº PEDIDO</th></tr></thead><tbody>{reportList.items.length?reportList.items.map(x=><tr key={x.id}><td><input className="check" type="checkbox" checked={n(sendQty[x.id])>0} onChange={e=>setSendQty({...sendQty,[x.id]:e.target.checked?x.qty:0})}/></td><td>{x.product}</td><td>{x.qty}</td><td><input className="qty" type="number" min="0" max={x.qty} value={sendQty[x.id]??0} onChange={e=>setSendQty({...sendQty,[x.id]:Math.min(n(e.target.value),x.qty)})}/></td><td>{x.color}</td><td>{x.pedido||'—'}</td></tr>):<tr><td colSpan="6" className="empty">A lista está sem saldo para envio.</td></tr>}</tbody></table></div><div className="report-total">QUANTIDADE DE PEÇAS: <b>{fmt(totalReport)}</b></div><button className="primary large" onClick={generateReport}>📄 GERAR E SALVAR RELATÓRIO</button></>:<div className="empty">Escolha uma lista para carregar os itens.</div>}</section>
 <section className="panel"><div className="section-head"><div><h2>SOMATÓRIA POR COSTUREIRA</h2><p>A soma considera todos os relatórios já salvos, sem duplicar o mesmo envio.</p></div></div><div className="summary-grid">{SEAMSTRESSES.map(s=><div className="summary-card" key={s}><span>{s}</span><b>{fmt(totals[s]||0)}</b><small>peças enviadas</small></div>)}</div></section>
 <section className="panel"><div className="section-head"><div><h2>RELATÓRIOS SALVOS</h2><p>Cada envio permanece individual e pode gerar os dois relatórios.</p></div></div>{reports.length===0?<div className="empty">Nenhum relatório salvo.</div>:<div className="saved-list">{reports.map(r=><article className="saved" key={r.id}><div><b>{r.costureira}</b><span>{r.listName} · {fmtDate(r.date)}</span><span>{fmt(r.items.reduce((s,x)=>s+n(x.qty),0))} peças · {r.groupedProducts?.length||groupProducts(r.items).length} produtos agrupados</span></div><div className="actions"><button onClick={()=>printReport(r,'pecas')}>📦 PEÇAS AGRUPADAS</button><button onClick={()=>printReport(r,'materiais')}>🧵 MATERIAIS</button><button className="primary" onClick={()=>printReport(r,'completo')}>📄 COMPLETO</button><button className="danger" onClick={()=>deleteReport(r.id)}>Excluir</button></div><details><summary>Ver produtos enviados</summary><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>Nº PEDIDO</th></tr></thead><tbody>{r.items.map((x,i)=><tr key={i}><td>{x.product}</td><td>{x.qty}</td><td>{x.color}</td><td>{x.pedido||'—'}</td></tr>)}</tbody></table></div></details></article>)}</div>}</section></main>}
 <footer>WORKNEO · ficha técnica baseada na FICHA SEPARAÇÃO 2026 · cálculo no relatório</footer></div>}
