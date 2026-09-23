@@ -41,6 +41,10 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const costureiras=useMemo(()=>[...new Set(reports.map(r=>r.costureira).filter(Boolean))].sort(),[reports]);
  const rows=useMemo(()=>filterProductionRows(data,filters),[data,filters]);
  const total=rows.reduce((s,r)=>s+r.qty,0);
+ const unsentLists=useMemo(()=>{
+   const sent=new Set(rows.map(r=>r.listId));
+   return lists.filter(l=>!sent.has(l.id));
+ },[lists,rows]);
  const grouped=useMemo(()=>{const m=new Map();for(const r of rows){const k=r.date+'|'+r.product;const old=m.get(k);if(old)old.qty+=r.qty;else m.set(k,{date:r.date,product:r.product,qty:r.qty})}return[...m.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.product.localeCompare(b.product))},[rows]);
  if(loading&&!data)return <main className="page"><section className="panel"><div className="empty">Carregando acompanhamento...</div></section></main>;
  if(error&&!data)return <main className="page"><section className="panel"><div className="empty">{error}</div></section></main>;
@@ -51,6 +55,8 @@ function PublicShare({data,loading,error,filters,setFilters}){
  <div className="actions"><button className="primary" onClick={()=>setFilters({startDate:'',endDate:'',costureira:share.share_type==='seamstress'?(share.costureira||''):'',product:'',listId:share.share_type==='list'?(share.list_id||''):''})}>🔄 LIMPAR FILTROS</button></div></section>
  <section className="summary-grid" style={{marginBottom:18}}><div className="summary-card"><span>PEÇAS ENVIADAS</span><b>{fmt(total)}</b><small>nos filtros atuais</small></div><div className="summary-card"><span>PRODUTOS</span><b>{new Set(rows.map(r=>r.product)).size}</b><small>produtos encontrados</small></div><div className="summary-card"><span>DIAS DE ENVIO</span><b>{new Set(rows.map(r=>r.date)).size}</b><small>dias com envio</small></div></section>
  <section className="panel"><div className="section-head"><div><h2>📅 PEÇAS POR PRODUTO E DIA DE ENVIO</h2><p>O dia mostrado é a data em que o relatório foi gerado e as peças foram enviadas à costureira.</p></div></div>{grouped.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>QUANTIDADE</th></tr></thead><tbody>{grouped.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada com estes filtros.</div>}</section>
+ <section className="panel"><div className="section-head"><div><h2>📋 LISTAS AINDA NÃO ENVIADAS</h2><p>Listas que não possuem nenhum envio dentro dos filtros atuais. A informação é atualizada automaticamente.</p></div></div>
+ {unsentLists.length?<div className="table-wrap"><table><thead><tr><th>LISTA</th><th>STATUS</th></tr></thead><tbody>{unsentLists.map(l=><tr key={l.id}><td>{l.name}</td><td><b style={{color:'#d97706'}}>AGUARDANDO ENVIO</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma lista pendente de envio dentro dos filtros atuais.</div>}</section>
  <section className="panel"><div className="section-head"><div><h2>📊 RESUMO POR COSTUREIRA</h2></div></div><div className="summary-grid">{costureiras.map(c=>{const q=rows.filter(r=>r.costureira===c).reduce((s,r)=>s+r.qty,0);return <div className="summary-card" key={c}><span>{c}</span><b>{fmt(q)}</b><small>peças</small></div>})}</div></section></main>
 }
 function App(){
