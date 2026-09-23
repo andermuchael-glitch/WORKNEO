@@ -15,6 +15,7 @@ export const supabase = isSupabaseConfigured
   : null;
 
 export const CLOUD_TABLE = 'workneo_data';
+export const AUTH_REDIRECT_URL = import.meta.env.VITE_AUTH_REDIRECT_URL || 'https://andermuchael-glitch.github.io/WORKNEO/';
 
 export async function loadCloudData(userId) {
   if (!supabase) throw new Error('Supabase não configurado.');
