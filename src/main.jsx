@@ -172,7 +172,7 @@ const resetPassword=async()=>{
   if(!supabase||!authEmail.trim()){setMessage('Informe seu e-mail para recuperar a senha.');return}
   setAuthBusy(true);
   try{
-    const{error}=await supabase.auth.resetPasswordForEmail(authEmail.trim(),{redirectTo:window.location.origin+window.location.pathname});
+    const{error}=await supabase.auth.resetPasswordForEmail(authEmail.trim(),{redirectTo:AUTH_REDIRECT_URL});
     if(error)throw error;
     setMessage('Se o e-mail estiver cadastrado, o link de recuperação será enviado.');
   }catch(error){setMessage(error?.message||'Não foi possível enviar a recuperação.')}finally{setAuthBusy(false)}
