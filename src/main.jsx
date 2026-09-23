@@ -5,7 +5,7 @@ import{Filesystem,Directory}from'@capacitor/filesystem';
 import{FileOpener}from'@capacitor-community/file-opener';
 import html2pdf from'html2pdf.js';
 import{MATERIAL_RULES}from'./materialRules.js';
-import{isSupabaseConfigured,supabase,loadCloudData,saveCloudData,subscribeToCloud}from'./supabaseClient.js';
+import{isSupabaseConfigured,supabase,loadCloudData,saveCloudData,subscribeToCloud,AUTH_REDIRECT_URL}from'./supabaseClient.js';
 import'./styles.css';
 
 const PRODUCTS=["PORTA GARRAFA LITRÃO","PORTA GARRAFA 600","PORTA GARRAFA 600 SEM ZÍPER","PORTA ÁGUA E ISOTÔNICO","BOLSA DE MÃO","BOLSA MEIA LUA","BARMAT","BARMAT GRANDE","LANCHEIRA","BOLSA FEMININA","CASE CELULAR","CASE NOTEBOOK","CORRENTE PARA ÓCULOS","CASE TABLET","CARTEIRA FEMININA","COOLER TÉRMICO LATERAL","PORTA ESPUMANTE 975ML","ESTOJO","PORTA GARRAFA LONG NECK 355ML","LIXEIRA AUTOMOTIVA","PORTA LATA 350ML","PORTA LATA 473ML","PORTA LATA PALITO 269ML","PORTA LATA PALITO 350ML","KIT LUVA DE FORNO","MÁSCARA PROTETORA","MATEIRA","MATEIRA PEQUENA","MINI BAG GRANDE LATERAL","PORTA MOEDAS","MOCHILA INFANTIL","MOCHILA TÉRMICA","MOUSE PAD","MOUSE PAD GAMER","MUNHEQUEIRA","NECESSAIRE","NECESSAIRE GRANDE","POCHETE","PORTA COPOS","PROTETOR FACIAL","PORTA ÓCULOS","PORTA SQUEEZE","PORTA VINHO DUPLO","PORTA VINHO DUPLO C/ PORTA TAÇAS","PORTA VINHO SIMPLES","MOCHILA TRANSVERSAL","MINI BAG PEQUENA TRANSVERSAL","TAG PARA MALA","COOLER TÉRMICO GRANDE","COOLER TÉRMICO PEQUENO","TAPA OLHO","VISEIRA","LATA CAMISA","LONG CAMISA","CANGA DE PRAIA","CANGA DE PRAIA G","MARMITEIRA IMPERMEÁVEL","MOCHILA IMPERMEÁVEL","VISEIRA TURBANTE","ESTEIRA DE PRAIA","WINE CASE DELUXE","WINE BAG"];
@@ -153,7 +153,7 @@ const handleAuth=async e=>{
   setAuthBusy(true);
   try{
     if(authMode==='signup'){
-      const{data,error}=await supabase.auth.signUp({email:authEmail.trim(),password:authPassword,options:{emailRedirectTo:window.location.origin+window.location.pathname}});
+      const{data,error}=await supabase.auth.signUp({email:authEmail.trim(),password:authPassword,options:{emailRedirectTo:AUTH_REDIRECT_URL}});
       if(error)throw error;
       if(data.session)setMessage('Conta criada e conectada.');
       else setMessage('Conta criada. Verifique o e-mail para confirmar o acesso.');
