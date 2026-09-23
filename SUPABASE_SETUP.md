@@ -42,3 +42,18 @@ No Supabase, em Authentication → URL Configuration, use como Site URL e Redire
 `https://andermuchael-glitch.github.io/WORKNEO/`
 
 O WORKNEO usa essa URL para confirmação de e-mail e recuperação de senha, inclusive quando o fluxo é iniciado no APK Android.
+
+
+## ACOMPANHAMENTO DE PRODUÇÃO POR LINK
+
+Depois de configurar a tabela principal, execute no SQL Editor do Supabase o arquivo `supabase/workneo_shares.sql`.
+
+O WORKNEO então permite criar links somente para leitura com escopo:
+- produção geral;
+- lista específica;
+- costureira específica;
+- período inicial/final.
+
+O visitante pode filtrar por período, costureira, produto e lista dentro do escopo autorizado. O link não expõe materiais, custos, e-mails ou a tabela privada `workneo_data`.
+
+A página compartilhada atualiza os dados automaticamente a cada 5 segundos. O proprietário pode desativar qualquer link criado.
