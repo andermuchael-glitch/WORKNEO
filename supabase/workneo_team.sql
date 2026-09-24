@@ -34,32 +34,16 @@ revoke all on public.workneo_workspace_members from anon,authenticated;
 grant select on public.workneo_workspaces to authenticated;
 grant select on public.workneo_workspace_members to authenticated;
 
-create or replace function public.workneo_current_membership(p_workspace_id uuid)
-returns public.workneo_workspace_members
-language sql
-security definer
-stable
-set search_path=''
-as $$
-  select m.*
-  from public.workneo_workspace_members m
-  where m.workspace_id=p_workspace_id
-    and m.user_id=(select auth.uid())
-    and m.active=true
-  limit 1;
-$$;
-
-revoke all on function public.workneo_current_membership(uuid) from public;
-
-grant execute on function public.workneo_current_membership(uuid) to authenticated;
-
 drop policy if exists "WORKNEO workspace member read" on public.workneo_workspaces;
 create policy "WORKNEO workspace member read"
 on public.workneo_workspaces for select to authenticated
 using (
   exists (
-    select 1 from public.workneo_workspace_members m
-    where m.workspace_id=id and m.user_id=(select auth.uid()) and m.active
+    select 1
+    from public.workneo_workspace_members m
+    where m.workspace_id=id
+      and m.user_id=(select auth.uid())
+      and m.active=true
   )
 );
 
@@ -67,26 +51,9 @@ drop policy if exists "WORKNEO member read team" on public.workneo_workspace_mem
 create policy "WORKNEO member read team"
 on public.workneo_workspace_members for select to authenticated
 using (
-  (select public.workneo_current_membership(workneo_workspace_members.workspace_id)) is not null
+  user_id=(select auth.uid())
+  and active=true
 );
-
-create or replace function public.workneo_current_membership(p_workspace_id uuid)
-returns public.workneo_workspace_members
-language sql
-security definer
-stable
-set search_path=''
-as $$
-  select m.*
-  from public.workneo_workspace_members m
-  where m.workspace_id=p_workspace_id
-    and m.user_id=(select auth.uid())
-    and m.active=true
-  limit 1;
-$$;
-
-revoke all on function public.workneo_current_membership(uuid) from public;
-grant execute on function public.workneo_current_membership(uuid) to authenticated;
 
 create or replace function public.ensure_workneo_workspace()
 returns jsonb
