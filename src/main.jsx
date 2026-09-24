@@ -236,7 +236,7 @@ useEffect(()=>{
 
 useEffect(()=>{
   if(!workspace?.owner_user_id||!isSupabaseConfigured)return;
-  return subscribeToWorkspaceData(workspace.owner_user_id,payload=>{
+  return subscribeToWorkspaceData(workspace.workspace_id,payload=>{
     if(!payload)return;
     if(payload.updated_at&&payload.updated_at===lastCloudUpdateRef.current)return;
     skipNextSyncRef.current=true;
