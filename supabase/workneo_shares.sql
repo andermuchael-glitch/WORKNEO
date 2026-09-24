@@ -115,7 +115,12 @@ begin
     and (s.start_date is null or (r->>'date')::date >= s.start_date)
     and (s.end_date is null or (r->>'date')::date <= s.end_date);
 
-  select coalesce(jsonb_agg(jsonb_build_object('id',l->>'id','name',l->>'name')),'[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',l->>'id',
+    'name',l->>'name',
+    'createdAt',l->>'createdAt',
+    'items',coalesce(l->'items','[]'::jsonb)
+  )),'[]'::jsonb)
   into v_lists
   from jsonb_array_elements(coalesce(d.lists,'[]'::jsonb)) l
   where (s.share_type<>'list' or l->>'id'=s.list_id);
