@@ -34,6 +34,25 @@ revoke all on public.workneo_workspace_members from anon,authenticated;
 grant select on public.workneo_workspaces to authenticated;
 grant select on public.workneo_workspace_members to authenticated;
 
+create or replace function public.workneo_current_membership(p_workspace_id uuid)
+returns public.workneo_workspace_members
+language sql
+security definer
+stable
+set search_path=''
+as $$
+  select m.*
+  from public.workneo_workspace_members m
+  where m.workspace_id=p_workspace_id
+    and m.user_id=(select auth.uid())
+    and m.active=true
+  limit 1;
+$$;
+
+revoke all on function public.workneo_current_membership(uuid) from public;
+
+grant execute on function public.workneo_current_membership(uuid) to authenticated;
+
 drop policy if exists "WORKNEO workspace member read" on public.workneo_workspaces;
 create policy "WORKNEO workspace member read"
 on public.workneo_workspaces for select to authenticated
@@ -113,7 +132,7 @@ begin
     (select email from auth.users where id=v_user)
   );
 
-  if not found then
+  if v_data.user_id is null then
     insert into public.workneo_data(user_id,lists,reports,updated_at)
     values(v_user,'[]'::jsonb,'[]'::jsonb,now())
     on conflict (user_id) do nothing;
