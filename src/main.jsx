@@ -42,12 +42,13 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const rows=useMemo(()=>filterProductionRows(data,filters),[data,filters]);
  const total=rows.reduce((s,r)=>s+r.qty,0);
  const unsentLists=useMemo(()=>{
-   // A lista permanece pendente enquanto ainda houver saldo de peças nela.
-   // Isso também cobre listas nunca enviadas e listas enviadas parcialmente.
+   // O acompanhamento público recebe os itens completos das listas.
+   // O saldo é a quantidade original menos o que já foi enviado.
    return lists.map(l=>{
-     const remaining=(Array.isArray(l.items)?l.items:[]).reduce((s,x)=>s+Number(x.qty||0),0);
-     const sentQty=rows.filter(r=>r.listId===l.id).reduce((s,r)=>s+Number(r.qty||0),0);
-     return {...l,remaining,sentQty};
+     const totalQty=(Array.isArray(l.items)?l.items:[]).reduce((sum,item)=>sum+Number(item.qty||0),0);
+     const sentQty=rows.filter(r=>r.listId===l.id).reduce((sum,r)=>sum+Number(r.qty||0),0);
+     const remaining=Math.max(0,totalQty-sentQty);
+     return {...l,totalQty,remaining,sentQty};
    }).filter(l=>l.remaining>0);
  },[lists,rows]);
  const grouped=useMemo(()=>{const m=new Map();for(const r of rows){const k=r.date+'|'+r.product;const old=m.get(k);if(old)old.qty+=r.qty;else m.set(k,{date:r.date,product:r.product,qty:r.qty})}return[...m.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.product.localeCompare(b.product))},[rows]);
