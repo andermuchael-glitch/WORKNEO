@@ -133,16 +133,21 @@ export async function removeWorkspaceMember(workspaceId,userId){
   return data;
 }
 
-export function subscribeToWorkspaceData(ownerUserId,onData,onStatus){
-  if(!supabase||!ownerUserId) return ()=>{};
-  const channel=supabase.channel('workneo-workspace-data-'+ownerUserId)
-    .on('postgres_changes',{
-      event:'*',schema:'public',table:CLOUD_TABLE,
-      filter:'user_id=eq.'+ownerUserId
-    },payload=>{
-      if(payload.eventType==='DELETE'){onData(null);return;}
-      onData(payload.new);
-    })
-    .subscribe(status=>onStatus?.(status));
-  return ()=>supabase.removeChannel(channel);
+export function subscribeToWorkspaceData(workspaceId,onData,onStatus){
+  if(!supabase||!workspaceId) return ()=>{};
+  let alive=true;
+  const poll=async()=>{
+    try{
+      const {data,error}=await supabase.rpc('get_workneo_workspace_data',{p_workspace_id:workspaceId});
+      if(!alive)return;
+      if(error)throw error;
+      onData(data);
+      onStatus?.('SUBSCRIBED');
+    }catch(error){
+      if(alive)onStatus?.('CHANNEL_ERROR',error);
+    }
+  };
+  poll();
+  const timer=setInterval(poll,5000);
+  return ()=>{alive=false;clearInterval(timer)};
 }
