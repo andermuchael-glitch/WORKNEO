@@ -26,6 +26,17 @@ export async function revokeProductionShare(shareId){
   return data;
 }
 
+export async function removeProductionShare(shareId){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase
+    .from('workneo_shares')
+    .delete()
+    .eq('id',shareId)
+    .select('id');
+  if(error) throw error;
+  return Array.isArray(data)&&data.length>0;
+}
+
 export async function loadPublicProductionShare(token){
   if(!supabase) throw new Error('Supabase não configurado.');
   const {data,error}=await supabase.rpc('get_workneo_share',{p_token:token});
