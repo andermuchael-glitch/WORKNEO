@@ -48,12 +48,7 @@ drop policy if exists "WORKNEO member read team" on public.workneo_workspace_mem
 create policy "WORKNEO member read team"
 on public.workneo_workspace_members for select to authenticated
 using (
-  exists (
-    select 1 from public.workneo_workspace_members me
-    where me.workspace_id=workneo_workspace_members.workspace_id
-      and me.user_id=(select auth.uid())
-      and me.active
-  )
+  (select public.workneo_current_membership(workneo_workspace_members.workspace_id)) is not null
 );
 
 create or replace function public.workneo_current_membership(p_workspace_id uuid)
