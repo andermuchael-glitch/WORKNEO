@@ -5,7 +5,7 @@ import{Filesystem,Directory}from'@capacitor/filesystem';
 import{FileOpener}from'@capacitor-community/file-opener';
 import html2pdf from'html2pdf.js';
 import{MATERIAL_RULES}from'./materialRules.js';
-import{isSupabaseConfigured,supabase,loadCloudData,saveCloudData,subscribeToCloud,AUTH_REDIRECT_URL}from'./supabaseClient.js';
+import{isSupabaseConfigured,supabase,loadCloudData,saveCloudData,subscribeToCloud,AUTH_REDIRECT_URL,ensureWorkspace,loadWorkspaceData,saveWorkspaceData,listWorkspaceMembers,addWorkspaceMember,setWorkspaceMemberRole,removeWorkspaceMember,subscribeToWorkspaceData}from'./supabaseClient.js';
 import{createProductionShare,listProductionShares,revokeProductionShare,loadPublicProductionShare,filterProductionRows}from'./productionShare.js';
 import'./styles.css';
 
@@ -123,7 +123,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
 
 function App(){
 const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>read(LISTS_KEY)),[reports,setReports]=useState(()=>read(REPORTS_KEY));
-const[session,setSession]=useState(null),[authLoading,setAuthLoading]=useState(isSupabaseConfigured),[authMode,setAuthMode]=useState('login'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authBusy,setAuthBusy]=useState(false),[syncStatus,setSyncStatus]=useState(isSupabaseConfigured?'aguardando login':'local');
+const[session,setSession]=useState(null),[workspace,setWorkspace]=useState(null),[teamMembers,setTeamMembers]=useState([]),[teamEmail,setTeamEmail]=useState(''),[teamName,setTeamName]=useState(''),[authLoading,setAuthLoading]=useState(isSupabaseConfigured),[authMode,setAuthMode]=useState('login'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authBusy,setAuthBusy]=useState(false),[syncStatus,setSyncStatus]=useState(isSupabaseConfigured?'aguardando login':'local');
 const shareToken=useMemo(()=>new URLSearchParams(window.location.search).get('acompanhamento')||'',[]);
 const[publicShare,setPublicShare]=useState(null),[publicShareLoading,setPublicShareLoading]=useState(Boolean(shareToken)),[publicShareError,setPublicShareError]=useState('');
 const[publicFilters,setPublicFilters]=useState({startDate:'',endDate:'',costureira:'',product:'',listId:''});
@@ -165,51 +165,55 @@ useEffect(()=>{
 },[session,shareToken]);
 
 useEffect(()=>{
-  if(!isSupabaseConfigured||!supabase||!session?.user?.id)return;
+  if(!session?.user?.id||!isSupabaseConfigured||!supabase)return;
+  let alive=true;
+  setWorkspace(null);
+  setTeamMembers([]);
+  cloudReadyRef.current=false;
+  setSyncStatus('sincronizando');
+  ensureWorkspace().then(async ws=>{
+    if(!alive)return;
+    setWorkspace(ws);
+    const members=await listWorkspaceMembers(ws.workspace_id);
+    if(alive)setTeamMembers(members);
+  }).catch(error=>{
+    console.error(error);
+    if(alive){
+      setSyncStatus('offline');
+      setMessage(error?.message||'Não foi possível preparar a equipe compartilhada.');
+    }
+  });
+  return()=>{alive=false};
+},[session]);
+
+useEffect(()=>{
+  if(!workspace?.workspace_id||!isSupabaseConfigured)return;
   let alive=true;
   cloudReadyRef.current=false;
   setSyncStatus('sincronizando');
-  loadCloudData(session.user.id).then(async cloud=>{
+  loadWorkspaceData(workspace.workspace_id).then(data=>{
     if(!alive)return;
-    if(cloud){
-      const cloudLists=Array.isArray(cloud.lists)?cloud.lists:[];
-      const cloudReports=Array.isArray(cloud.reports)?cloud.reports:[];
-      const cloudHasData=cloudLists.length>0||cloudReports.length>0;
-      const localHasData=lists.length>0||reports.length>0;
-      if(!cloudHasData&&localHasData){
-        const created=await saveCloudData(session.user.id,lists,reports);
-        if(!alive)return;
-        lastCloudUpdateRef.current=created.updated_at||'';
-        setSyncStatus('sincronizado');
-        setMessage('Dados locais encontrados e enviados para a nuvem.');
-      }else{
-        skipNextSyncRef.current=true;
-        lastCloudUpdateRef.current=cloud.updated_at||'';
-        setLists(cloudLists);write(LISTS_KEY,cloudLists);
-        setReports(cloudReports);write(REPORTS_KEY,cloudReports);
-        setSyncStatus('sincronizado');
-      }
-    }else{
-      const created=await saveCloudData(session.user.id,lists,reports);
-      if(!alive)return;
-      lastCloudUpdateRef.current=created.updated_at||'';
-      setSyncStatus('sincronizado');
-      if(lists.length||reports.length)setMessage('Dados locais encontrados e enviados para a nuvem.');
-    }
+    skipNextSyncRef.current=true;
+    lastCloudUpdateRef.current=data?.updated_at||'';
+    const cloudLists=Array.isArray(data?.lists)?data.lists:[];
+    const cloudReports=Array.isArray(data?.reports)?data.reports:[];
+    setLists(cloudLists);write(LISTS_KEY,cloudLists);
+    setReports(cloudReports);write(REPORTS_KEY,cloudReports);
+    setSyncStatus('sincronizado');
     cloudReadyRef.current=true;
   }).catch(error=>{
     console.error(error);
     if(alive){
       cloudReadyRef.current=true;
       setSyncStatus('offline');
-      setMessage('Não foi possível acessar a nuvem. O WORKNEO continua usando os dados locais.');
+      setMessage(error?.message||'Não foi possível carregar os dados compartilhados.');
     }
   });
   return()=>{alive=false;cloudReadyRef.current=false};
-},[session]);
+},[workspace?.workspace_id]);
 
 useEffect(()=>{
-  if(!session?.user?.id||!cloudReadyRef.current||!isSupabaseConfigured)return;
+  if(!workspace?.workspace_id||!cloudReadyRef.current||!isSupabaseConfigured)return;
   if(skipNextSyncRef.current){
     skipNextSyncRef.current=false;
     return;
@@ -218,22 +222,22 @@ useEffect(()=>{
   setSyncStatus('salvando...');
   syncTimerRef.current=setTimeout(async()=>{
     try{
-      const saved=await saveCloudData(session.user.id,lists,reports);
-      lastCloudUpdateRef.current=saved.updated_at||'';
+      const saved=await saveWorkspaceData(workspace.workspace_id,lists,reports);
+      lastCloudUpdateRef.current=saved?.updated_at||'';
       setSyncStatus('sincronizado');
     }catch(error){
       console.error(error);
       setSyncStatus('offline');
-      setMessage('Alteração salva no aparelho, mas não foi possível sincronizar agora.');
+      setMessage(error?.message||'A alteração não pôde ser sincronizada.');
     }
   },650);
   return()=>clearTimeout(syncTimerRef.current);
-},[lists,reports,session]);
+},[lists,reports,workspace?.workspace_id]);
 
 useEffect(()=>{
-  if(!session?.user?.id||!isSupabaseConfigured)return;
-  return subscribeToCloud(session.user.id,payload=>{
-    if(!payload||payload.user_id!==session.user.id)return;
+  if(!workspace?.owner_user_id||!isSupabaseConfigured)return;
+  return subscribeToWorkspaceData(workspace.owner_user_id,payload=>{
+    if(!payload)return;
     if(payload.updated_at&&payload.updated_at===lastCloudUpdateRef.current)return;
     skipNextSyncRef.current=true;
     lastCloudUpdateRef.current=payload.updated_at||'';
@@ -245,7 +249,8 @@ useEffect(()=>{
   },status=>{
     if(status==='SUBSCRIBED')setSyncStatus('sincronizado');
   });
-},[session]);
+},[workspace?.owner_user_id]);
+
 
 const handleAuth=async e=>{
   e.preventDefault();
