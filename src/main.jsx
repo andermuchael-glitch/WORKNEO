@@ -59,10 +59,18 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const pendingLists=useMemo(()=>{
    return lists.map(l=>{
      if(filters.listId&&l.id!==filters.listId)return null;
-     const totalQty=(l.items||[]).reduce((s,i)=>s+Number(i.qty||0),0);
-     const sentQty=rows.filter(r=>r.listId===l.id).reduce((s,r)=>s+r.qty,0);
-     const pending=Math.max(0,totalQty-sentQty);
-     return pending>0?{...l,totalQty,sentQty,pending}:null;
+     const pendingItems=(l.items||[]).map(item=>{
+       const original=Number(item.qty||0);
+       const sent=rows.filter(r=>r.listId===l.id&&r.product===item.product).reduce((sum,r)=>sum+r.qty,0);
+       return {...item,original,sent,pending:Math.max(0,original-sent)};
+     }).filter(item=>item.pending>0);
+     const pending=pendingItems.reduce((sum,item)=>sum+item.pending,0);
+     const sentQty=(l.items||[]).reduce((sum,item)=>{
+       const original=Number(item.qty||0);
+       const sent=rows.filter(r=>r.listId===l.id&&r.product===item.product).reduce((s,r)=>s+r.qty,0);
+       return sum+Math.min(original,sent);
+     },0);
+     return pending>0?{...l,pendingItems,pending,sentQty}:null;
    }).filter(Boolean);
  },[lists,rows,filters.listId]);
  const filteredReports=useMemo(()=>reports.filter(r=>{
