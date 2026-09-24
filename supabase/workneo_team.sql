@@ -69,10 +69,17 @@ declare
 begin
   if v_user is null then raise exception 'Não autenticado'; end if;
 
+  -- Se o usuário já possui uma equipe própria e também foi convidado
+  -- para outra equipe, priorizar a equipe da qual ele é colaborador.
+  -- Isso evita que uma conta antiga continue entrando como ADMINISTRADOR
+  -- na própria equipe em vez da equipe compartilhada pelo proprietário.
   select m.* into v_member
   from public.workneo_workspace_members m
+  join public.workneo_workspaces w on w.id=m.workspace_id
   where m.user_id=v_user and m.active=true
-  order by m.created_at
+  order by
+    case when w.owner_user_id <> v_user then 0 else 1 end,
+    m.created_at desc
   limit 1;
 
   if found then
