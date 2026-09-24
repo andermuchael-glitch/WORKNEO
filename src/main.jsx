@@ -43,19 +43,19 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const total=rows.reduce((s,r)=>s+r.qty,0);
  const grouped=useMemo(()=>{const m=new Map();for(const r of rows){const k=r.date+'|'+r.product;const old=m.get(k);if(old)old.qty+=r.qty;else m.set(k,{date:r.date,product:r.product,qty:r.qty})}return[...m.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.product.localeCompare(b.product))},[rows]);
  const pendingProducts=useMemo(()=>{
-   const original=new Map();
+   const result=[];
    for(const l of lists){
      if(filters.listId&&l.id!==filters.listId)continue;
-     for(const i of (l.items||[])){
-       if(filters.product&&i.product!==filters.product)continue;
-       const key=i.product;
-       original.set(key,(original.get(key)||0)+Number(i.qty||0));
+     for(const item of (l.items||[])){
+       const current=Number(item.qty||0);
+       const itemKey=String(item.product||'')+'|'+String(item.pedido||'')+'|'+String(item.color||'');
+       const sent=rows.filter(r=>r.listId===l.id&&String(r.product||'')+'|'+String(r.pedido||'')+'|'+String(r.color||'')===itemKey).reduce((sum,r)=>sum+Number(r.qty||0),0);
+       const pending=Math.max(0,current);
+       if(pending>0) result.push({...item,listName:l.name,listId:l.id,original:pending+sent,sent,pending});
      }
    }
-   const sent=new Map();
-   for(const r of rows)sent.set(r.product,(sent.get(r.product)||0)+r.qty);
-   return [...original.entries()].map(([product,qty])=>({product,original:qty,sent:sent.get(product)||0,pending:Math.max(0,qty-(sent.get(product)||0))})).filter(x=>x.pending>0).sort((a,b)=>b.pending-a.pending||a.product.localeCompare(b.product));
- },[lists,rows,filters.listId,filters.product]);
+   return result.sort((a,b)=>b.pending-a.pending||String(a.listName).localeCompare(String(b.listName))||String(a.product).localeCompare(String(b.product)));
+ },[lists,rows,filters.listId]);
  const pendingLists=useMemo(()=>{
    return lists.map(l=>{
      if(filters.listId&&l.id!==filters.listId)return null;
@@ -108,7 +108,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
 
  <section className="panel"><div className="section-head"><div><h2>📅 RESUMO POR PRODUTO E DIA DE ENVIO</h2><p>O dia é a data do envio do relatório à costureira.</p></div></div>{grouped.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>QUANTIDADE</th></tr></thead><tbody>{grouped.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada.</div>}</section>
 
- <section className="panel"><div className="section-head"><div><h2>⏳ ITENS PENDENTES DE ENVIO</h2><p>Todos os itens que ainda possuem quantidade aguardando envio para a costura.</p></div></div>{pendingLists.length?<div style={{display:'grid',gap:14}}>{pendingLists.map(l=><div key={l.id} className="table-wrap"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'12px 14px',borderBottom:'1px solid #e5e7eb',flexWrap:'wrap'}}><div><strong style={{fontSize:16}}>{l.name}</strong><div style={{fontSize:12,color:'#64748b',marginTop:3}}>{l.pendingItems.length} item(ns) pendente(s)</div></div><div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}><strong style={{color:'#d97706',fontSize:18}}>{fmt(l.pending)} peças</strong><b style={{color:'#d97706'}}>{l.sentQty>0?'ENVIO PARCIAL':'AGUARDANDO ENVIO'}</b></div></div><table><thead><tr><th>PRODUTO</th><th>PEDIDO</th><th>COR</th><th>ORIGINAL</th><th>ENVIADO</th><th>PENDENTE</th></tr></thead><tbody>{l.pendingItems.map((item,i)=><tr key={item.id||item.product+'-'+i}><td><b>{item.product}</b></td><td>{item.pedido||'—'}</td><td>{item.color||'—'}</td><td>{fmt(item.original)}</td><td>{fmt(item.sent)}</td><td><b style={{color:'#d97706'}}>{fmt(item.pending)}</b></td></tr>)}</tbody></table></div>)}</div>:<div className="empty">Nenhum item pendente dentro dos filtros atuais.</div>}</section>ct,{useEffect,useMemo,useRef,useState}from'react';
+ <section className="panel"><div className="section-head"><div><h2>⏳ ITENS PENDENTES DE ENVIO</h2><p>Todos os itens que ainda não foram enviados para a costura, reunidos em uma única lista.</p></div></div>{pendingProducts.length?<div className="table-wrap"><table><thead><tr><th>LISTA</th><th>PRODUTO</th><th>PEDIDO</th><th>COR</th><th>ORIGINAL</th><th>ENVIADO</th><th>PENDENTE</th></tr></thead><tbody>{pendingProducts.map((x,i)=><tr key={x.id||x.listId+'-'+x.product+'-'+i}><td>{x.listName||'—'}</td><td><b>{x.product}</b></td><td>{x.pedido||'—'}</td><td>{x.color||'—'}</td><td>{fmt(x.original)}</td><td>{fmt(x.sent)}</td><td><b style={{color:'#d97706'}}>{fmt(x.pending)}</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhum item pendente dentro dos filtros atuais.</div>}</section>ct,{useEffect,useMemo,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import{Capacitor}from'@capacitor/core';
 import{Filesystem,Directory}from'@capacitor/filesystem';
