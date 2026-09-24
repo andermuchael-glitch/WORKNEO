@@ -377,6 +377,9 @@ $$;
 revoke all on function public.remove_workneo_member(uuid,uuid) from public;
 grant execute on function public.remove_workneo_member(uuid,uuid) to authenticated;
 
+-- A equipe acessa os dados compartilhados somente pelas funções autorizadas.
+revoke select, insert, update, delete on public.workneo_data from authenticated;
+
 -- Garantir que os dados antigos do proprietário continuem sendo lidos pelo acompanhamento público.
 -- O acompanhamento existente usa owner_user_id e workneo_data, então não precisa de migração de formato.
 
