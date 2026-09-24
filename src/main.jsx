@@ -89,7 +89,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    }
    const mats=calculateMaterials(items),map=new Map();
    for(const m of mats){
-     const key=m.material+'|'+m.spec+'|'+m.unit;
+     const key=m.material+'|'+m.spec+'|'+m.unit+'|'+m.color;
      const old=map.get(key);
      if(old)old.qty+=m.qty; else map.set(key,{...m,key});
    }
@@ -113,7 +113,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
 
  <section className="panel"><div className="section-head"><div><h2>📋 LISTAS AINDA NÃO ENVIADAS</h2><p>Lista completa e saldo de peças que ainda aguardam envio.</p></div></div>{pendingLists.length?<div className="table-wrap"><table><thead><tr><th>LISTA</th><th>PEÇAS PENDENTES</th><th>STATUS</th></tr></thead><tbody>{pendingLists.map(l=><tr key={l.id}><td>{l.name}</td><td>{fmt(l.pending)}</td><td><b style={{color:'#d97706'}}>{l.sentQty>0?'ENVIO PARCIAL':'AGUARDANDO ENVIO'}</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma lista pendente de envio.</div>}</section>
 
- <section className="panel"><div className="section-head"><div><h2>🧵 MATERIAIS ENVIADOS PARA A COSTURA</h2><p>Quantidades calculadas pela ficha técnica dos produtos enviados no período e filtros selecionados.</p></div></div>{materialTotals.length?<div className="table-wrap"><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>TOTAL</th></tr></thead><tbody>{materialTotals.map(m=><tr key={m.key}><td><b>{m.material}</b></td><td>{m.spec||'—'}</td><td>{fmt(m.qty)} {m.unit}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhum material calculado para os filtros atuais.</div>}</section>
+ <section className="panel"><div className="section-head"><div><h2>🧵 MATERIAIS ENVIADOS PARA A COSTURA</h2><p>Quantidades calculadas pela ficha técnica dos produtos enviados no período e filtros selecionados.</p></div></div>{materialTotals.length?<div className="table-wrap"><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>{materialTotals.map(m=><tr key={m.key}><td><b>{m.material}</b></td><td>{m.spec||'—'}</td><td>{m.color||'SEM COR'}</td><td>{fmt(m.qty)} {m.unit}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhum material calculado para os filtros atuais.</div>}</section>
 
  <section className="panel"><div className="section-head"><div><h2>📄 RELATÓRIOS FEITOS</h2><p>Cada envio fica disponível para consulta, com produtos e materiais calculados.</p></div></div>{filteredReports.length?<div className="saved-list">{filteredReports.map(r=>{const q=(r.items||[]).reduce((s,x)=>s+n(x.qty),0);const rm=calculateMaterials(r.items||[]);return <article className="saved" key={r.id}><div><b>{r.costureira}</b><span>{r.listName} · {fmtDate(r.date)}</span><span>{fmt(q)} peças · {r.items?.length||0} itens</span></div><details><summary>👁 Visualizar relatório</summary><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>PEDIDO</th></tr></thead><tbody>{(r.items||[]).map((x,i)=><tr key={i}><td>{x.product}</td><td>{fmt(x.qty)}</td><td>{x.color||'—'}</td><td>{x.pedido||'—'}</td></tr>)}</tbody></table></div><h3 style={{marginTop:16}}>Materiais deste relatório</h3><div className="table-wrap"><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>TOTAL</th></tr></thead><tbody>{rm.map(m=><tr key={m.key}><td>{m.material}</td><td>{m.spec||'—'}</td><td>{fmt(m.qty)} {m.unit}</td></tr>)}</tbody></table></div></details></article>})}</div>:<div className="empty">Nenhum relatório encontrado.</div>}</section>
 
