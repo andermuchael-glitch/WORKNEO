@@ -74,3 +74,75 @@ export function subscribeToCloud(userId, onData, onStatus) {
     supabase.removeChannel(channel);
   };
 }
+
+
+export async function ensureWorkspace(){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('ensure_workneo_workspace');
+  if(error) throw error;
+  return data;
+}
+
+export async function loadWorkspaceData(workspaceId){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('get_workneo_workspace_data',{p_workspace_id:workspaceId});
+  if(error) throw error;
+  return data;
+}
+
+export async function saveWorkspaceData(workspaceId,lists,reports){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('save_workneo_workspace_data',{
+    p_workspace_id:workspaceId,p_lists:lists,p_reports:reports
+  });
+  if(error) throw error;
+  return data;
+}
+
+export async function listWorkspaceMembers(workspaceId){
+  if(!supabase) return [];
+  const {data,error}=await supabase.rpc('list_workneo_members',{p_workspace_id:workspaceId});
+  if(error) throw error;
+  return Array.isArray(data)?data:[];
+}
+
+export async function addWorkspaceMember(workspaceId,email,displayName=''){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('add_workneo_member',{
+    p_workspace_id:workspaceId,p_email:email,p_display_name:displayName||null
+  });
+  if(error) throw error;
+  return data;
+}
+
+export async function setWorkspaceMemberRole(workspaceId,userId,role){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('set_workneo_member_role',{
+    p_workspace_id:workspaceId,p_user_id:userId,p_role:role
+  });
+  if(error) throw error;
+  return data;
+}
+
+export async function removeWorkspaceMember(workspaceId,userId){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('remove_workneo_member',{
+    p_workspace_id:workspaceId,p_user_id:userId
+  });
+  if(error) throw error;
+  return data;
+}
+
+export function subscribeToWorkspaceData(ownerUserId,onData,onStatus){
+  if(!supabase||!ownerUserId) return ()=>{};
+  const channel=supabase.channel('workneo-workspace-data-'+ownerUserId)
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:CLOUD_TABLE,
+      filter:'user_id=eq.'+ownerUserId
+    },payload=>{
+      if(payload.eventType==='DELETE'){onData(null);return;}
+      onData(payload.new);
+    })
+    .subscribe(status=>onStatus?.(status));
+  return ()=>supabase.removeChannel(channel);
+}
