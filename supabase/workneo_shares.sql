@@ -103,9 +103,9 @@ begin
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',r->>'id','listId',r->>'listId','listName',r->>'listName',
-    'date',r->>'date','costureira',r->>'costureira',
+    'date',r->>'date','costureira',r->>'costureira','createdBy',coalesce(r->'createdBy','{}'::jsonb),
     'items',(select coalesce(jsonb_agg(jsonb_build_object(
-      'product',i->>'product','qty',i->>'qty','color',i->>'color','pedido',i->>'pedido'
+      'product',i->>'product','qty',i->>'qty','color',i->>'color','pedido',i->>'pedido','createdBy',coalesce(i->'createdBy','{}'::jsonb)
     )),'[]'::jsonb) from jsonb_array_elements(coalesce(r->'items','[]'::jsonb)) i)
   )),'[]'::jsonb)
   into v_reports
