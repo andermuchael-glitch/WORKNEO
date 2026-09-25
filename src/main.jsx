@@ -82,6 +82,24 @@ function PublicShare({data,loading,error,filters,setFilters}){
      return hay.includes(search);
    });
  },[pendingItems,search]);
+ const separationReturns=useMemo(()=>{
+   const out=[];
+   for(const r of reports) for(const ret of (r.returns||[])) for(const item of (ret.items||[])){
+     out.push({key:r.id+'|'+ret.id+'|'+(item.itemId||item.product),reportId:r.id,returnId:ret.id,date:ret.date||r.date,product:item.product||'—',color:item.color||'SEM COR',pedido:item.pedido||'—',qty:Number(item.qty||0),costureira:r.costureira||'—',listName:r.listName||'—',archived:Boolean(ret.archived),archivedAt:ret.archivedAt||'',client:item.cliente||'',tracking:item.tracking||''});
+   }
+   return out.filter(x=>{
+     const rr=reports.find(r=>r.id===x.reportId);
+     if(filters.listId&&rr?.listId!==filters.listId)return false;
+     if(filters.costureira&&x.costureira!==filters.costureira)return false;
+     if(filters.startDate&&x.date<filters.startDate)return false;
+     if(filters.endDate&&x.date>filters.endDate)return false;
+     if(filters.product&&x.product!==filters.product)return false;
+     if(search&&!([x.pedido,x.product,x.color,x.costureira,x.listName,x.client,x.tracking].join(' ').toLowerCase().includes(search)))return false;
+     return true;
+   }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+ },[reports,filters.listId,filters.costureira,filters.startDate,filters.endDate,filters.product,search]);
+ const pendingSeparationReturns=useMemo(()=>separationReturns.filter(x=>!x.archived),[separationReturns]);
+ const archivedSeparationReturns=useMemo(()=>separationReturns.filter(x=>x.archived),[separationReturns]);
  const total=rows.reduce((s,r)=>s+Number(r.sewingQty||0),0);
  const pendingTotal=filteredPending.reduce((s,r)=>s+r.pending,0);
  const sentByKey=useMemo(()=>{
@@ -120,6 +138,8 @@ function PublicShare({data,loading,error,filters,setFilters}){
    }).sort((a,b)=>String(a.pedido).localeCompare(String(b.pedido),undefined,{numeric:true}));
  },[baseRows,pendingItems,search,onlySewing,showPending]);
  const [expandedOrder,setExpandedOrder]=useState('');
+ const [trackingTab,setTrackingTab]=useState('pedidos');
+ const [showArchivedTrackingSeparation,setShowArchivedTrackingSeparation]=useState(false);
  const [materialsOpen,setMaterialsOpen]=useState(false);
  const [summaryOpen,setSummaryOpen]=useState(false);
  const [historyOpen,setHistoryOpen]=useState(false);
@@ -168,6 +188,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
      <div className="section-head"><div><div className="eyebrow">🔗 ACOMPANHAMENTO DE PRODUÇÃO</div><h2>{scopeLabel}</h2><p>Consulte pedidos, etapas de corte/costura e materiais em uma única tela.</p></div><div className="status status-online">● ONLINE</div></div>
      <div className="tracking-actions">
        <button className="secondary-action" onClick={()=>scrollTo('pedidos')}>📦 PEDIDOS</button>
+       <button className={'secondary-action '+(trackingTab==='separacao'?'active':'')} onClick={()=>{setTrackingTab('separacao');scrollTo('separacao')}}>📦 SEPARAÇÃO <b>({pendingSeparationReturns.length})</b></button>
        <button className="secondary-action" onClick={()=>scrollTo('pendentes')}>⏳ PENDENTES</button>
        <button className="secondary-action" onClick={()=>scrollTo('materiais')}>🧵 MATÉRIAS-PRIMAS</button>
        <button className="secondary-action" onClick={()=>scrollTo('resumo')}>📊 RESUMO</button>
@@ -217,6 +238,12 @@ function PublicShare({data,loading,error,filters,setFilters}){
          </div>}
        </article>
      })}</div>:<div className="empty">Nenhum pedido encontrado com os filtros atuais.</div>}
+   </section>
+
+   <section className="panel tracking-separation-panel" id="separacao">
+     <div className="section-head"><div><div className="eyebrow">📦 RETORNOS DA COSTURA</div><h2>SEPARAÇÃO</h2><p>Peças que retornaram da costura e aguardam conferência. Depois de conferidas, elas podem ser arquivadas no sistema.</p></div><div className="summary-card separation-live"><span>AGUARDANDO CONFERÊNCIA</span><b>{fmt(pendingSeparationReturns.reduce((s,x)=>s+x.qty,0))}</b><small>{pendingSeparationReturns.length} retorno(s)</small></div></div>
+     <div className="status-filters"><button className={!showArchivedTrackingSeparation?'active':''} onClick={()=>setShowArchivedTrackingSeparation(false)}>PENDENTES ({pendingSeparationReturns.length})</button><button className={showArchivedTrackingSeparation?'active':''} onClick={()=>setShowArchivedTrackingSeparation(true)}>ARQUIVADOS ({archivedSeparationReturns.length})</button></div>
+     {(showArchivedTrackingSeparation?archivedSeparationReturns:pendingSeparationReturns).length?<div className="table-wrap"><table><thead><tr><th>DATA</th><th>PRODUTO</th><th>COR</th><th>PEDIDO</th><th>QTD. RETORNO</th><th>COSTUREIRA</th><th>LISTA</th><th>STATUS</th></tr></thead><tbody>{(showArchivedTrackingSeparation?archivedSeparationReturns:pendingSeparationReturns).map(x=><tr key={x.key}><td>{fmtDate(x.date)}</td><td><b>{x.product}</b></td><td>{x.color}</td><td>{x.pedido}</td><td><strong>{fmt(x.qty)}</strong></td><td>{x.costureira}</td><td>{x.listName}</td><td><span className={x.archived?'badge badge-returned':'badge badge-pending'}>{x.archived?'✓ CONFERIDO / ARQUIVADO':'⏳ AGUARDANDO CONFERÊNCIA'}</span></td></tr>)}</tbody></table></div>:<div className="empty">{showArchivedTrackingSeparation?'Nenhum retorno arquivado encontrado.':'Nenhuma peça aguardando conferência na SEPARAÇÃO.'}</div>}
    </section>
 
    <section className="panel" id="pendentes">
