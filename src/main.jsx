@@ -247,6 +247,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
  </main>;
 }
 function App(){
+const[blackTheme,toggleBlackTheme]=useBlackTheme();
 const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>read(LISTS_KEY)),[reports,setReports]=useState(()=>read(REPORTS_KEY));
 const[session,setSession]=useState(null),[workspace,setWorkspace]=useState(null),[teamMembers,setTeamMembers]=useState([]),[teamEmail,setTeamEmail]=useState(''),[teamName,setTeamName]=useState(''),[authLoading,setAuthLoading]=useState(isSupabaseConfigured),[authMode,setAuthMode]=useState('login'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authBusy,setAuthBusy]=useState(false),[syncStatus,setSyncStatus]=useState(isSupabaseConfigured?'aguardando login':'local');
 const shareToken=useMemo(()=>new URLSearchParams(window.location.search).get('acompanhamento')||'',[]);
