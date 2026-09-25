@@ -48,14 +48,8 @@ function PublicShare({data,loading,error,filters,setFilters}){
    return filterProductionRows(data,clean);
  },[data,filters.startDate,filters.endDate,filters.costureira,filters.listId,filters.product]);
  const pendingItems=useMemo(()=>{
-   // Retorno à separação não significa novo "pendente de envio".
-   // A lista volta a conter as peças fisicamente, mas o histórico de retorno
-   // deve ser descontado do saldo que ainda nunca foi enviado à costura.
-   const returnedByKey=new Map();
-   for(const r of baseRows){
-     const key=[r.listId,r.product,r.color||'SEM COR',r.pedido||'SEM PEDIDO'].join('|');
-     returnedByKey.set(key,(returnedByKey.get(key)||0)+Number(r.returnedQty||0));
-   }
+   // Pendente é somente o que ainda não foi enviado pela primeira vez.
+   // Retornos ficam no campo SEPARAÇÃO e não voltam para o saldo da lista.
    const original=new Map();
    for(const l of lists){
      if(filters.listId&&l.id!==filters.listId)continue;
@@ -65,15 +59,13 @@ function PublicShare({data,loading,error,filters,setFilters}){
        const pedido=item.pedido||'SEM PEDIDO';
        const key=[l.id,item.product,color,pedido].join('|');
        const old=original.get(key);
-       if(old)old.original+=Number(item.qty||0);
-       else original.set(key,{key,listId:l.id,listName:l.name,product:item.product,color,pedido,cliente:item.cliente||item.customer||'',tracking:item.tracking||item.codigoAcompanhamento||'',original:Number(item.qty||0)});
+       const qty=Math.max(0,Number(item.qty||0));
+       if(old)old.original+=qty;
+       else original.set(key,{key,listId:l.id,listName:l.name,product:item.product,color,pedido,cliente:item.cliente||item.customer||'',tracking:item.tracking||item.codigoAcompanhamento||'',original:qty});
      }
    }
-   return [...original.values()].map(item=>{
-     const returned=returnedByKey.get(item.key)||0;
-     return {...item,returned,pending:Math.max(0,item.original-returned)};
-   }).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));
- },[lists,baseRows,filters.listId,filters.product]);
+   return [...original.values()].map(item=>({...item,pending:item.original})).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));
+ },[lists,filters.listId,filters.product]);
  const rows=useMemo(()=>{
    const q=search;
    return baseRows.filter(row=>{
@@ -465,8 +457,8 @@ const generateReport=()=>{if(!reportList){setMessage('Escolha uma lista no Relat
    if(l.id!==report.listId)return l;
    const exists=(l.items||[]).some(x=>x.id===itemId);
    return {...l,items:exists
-     ? l.items.map(x=>x.id===itemId?{...x,qty:n(x.qty)+requested}:x)
-     : [...l.items,{id:itemId,product:reportItem.product,qty:requested,color:reportItem.color||'SEM COR',pedido:String(reportItem.pedido||''),createdBy:a,returnedFromReportId:reportId,returnedAt:now}]
+     ? l.items.map(x=>x.id===itemId?{...x,separacaoQty:n(x.separacaoQty??x.qty)+requested}:x)
+     : [...l.items,{id:itemId,product:reportItem.product,qty:0,separacaoQty:requested,color:reportItem.color||'SEM COR',pedido:String(reportItem.pedido||''),createdBy:a,returnedFromReportId:reportId,returnedAt:now}]
    };
  });
  saveReports(updatedReports);
@@ -474,7 +466,7 @@ const generateReport=()=>{if(!reportList){setMessage('Escolha uma lista no Relat
  setReturnQty(v=>{const next={...v};delete next[reportId+'|'+itemId];return next});
  setMessage('Retorno registrado: '+fmt(requested)+' peça(s) lançado(s) no campo SEPARAÇÃO, sem aumentar a quantidade da lista, e baixado(s) da costura.');
 };
-const totalReport=reportList?reportList.items.reduce((s,x)=>s+Math.min(n(sendQty[x.id]),n(x.qty)),0):0;
+const totalReport=reportList?reportList.items.reduce((s,x)=>s+Math.min(n(sendQty[x.id]),Math.max(0,n(x.separacaoQty??x.qty))),0):0;
 const totals=useMemo(()=>{const m={};for(const r of reports)m[r.costureira]=(m[r.costureira]||0)+r.items.reduce((s,x)=>s+n(x.qty),0);return m},[reports]);
 const seamstressDetails=useMemo(()=>{const map={};for(const name of SEAMSTRESSES)map[name]={sent:0,returned:0,remaining:0,items:[]};for(const r of reports){const name=r.costureira||'SEM COSTUREIRA';if(!map[name])map[name]={sent:0,returned:0,remaining:0,items:[]};for(const x of r.items||[]){const sent=n(x.qty),returned=Math.min(sent,n(x.returnedQty)),remaining=Math.max(0,sent-returned);map[name].sent+=sent;map[name].returned+=returned;map[name].remaining+=remaining;map[name].items.push({id:r.id+'|'+x.id,reportId:r.id,product:x.product||'—',color:x.color||'SEM COR',pedido:x.pedido||'—',listName:r.listName||'—',date:r.date,costureira:name,sent,returned,remaining});}}return map},[reports]);const sewingBalance=useMemo(()=>reports.reduce((s,r)=>s+(r.items||[]).reduce((a,x)=>a+Math.max(0,n(x.qty)-n(x.returnedQty)),0),0),[reports]);
 const returnedTotal=useMemo(()=>reports.reduce((s,r)=>s+(r.items||[]).reduce((a,x)=>a+n(x.returnedQty),0),0),[reports]);
