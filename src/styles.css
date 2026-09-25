@@ -117,3 +117,30 @@ body.theme-black .page,body.theme-black .tracking-page{color:#f1f5f9}body.theme-
 
 /* Correção final: o tema escuro cobre também a área raiz da página */
 html.theme-black,html.theme-black body,body.theme-black{background:#182230!important;color:#f4f8fc!important;color-scheme:dark}html.theme-black #root{background:#182230!important;color:#f4f8fc!important;min-height:100vh}.theme-black .page{background:transparent!important}.theme-black .tracking-page{background:transparent!important}.theme-black .panel{background:#243141!important;color:#f1f5f9}.theme-black .tabs{background:#172332!important}.theme-black .saved{background:#243141!important}.theme-black .list-card{background:#253444!important}.theme-black .tracking-hero{background:linear-gradient(135deg,#253547,#1d2c3b)!important}
+
+/* Retorno da costura — baixa do saldo em produção e devolução para separação */
+.sewing-return-panel{border-left:4px solid #69b9ff}
+.return-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.return-summary>div{border:1px solid #d7e1ef;border-radius:10px;padding:12px 14px;background:#f7faff;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.return-summary span{font-size:11px;font-weight:900;letter-spacing:.06em;color:#64748b}
+.return-summary b{font-size:20px;color:#1769e0}
+.return-report{border-left:3px solid #69b9ff}
+.return-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+.return-report-head>div{display:grid;gap:3px}
+.return-report-head span{color:#64748b;font-size:12px}
+.return-qty{width:90px;min-width:90px}
+.return-btn{white-space:nowrap}
+.return-note{margin-top:12px}
+.badge-sewing{background:#eaf3ff;color:#1769e0;border-color:#b8d8ff}
+.badge-sent{background:#eafaf0;color:#16804b;border-color:#b7e3c8}
+.theme-black .return-summary>div{background:#243141;border-color:#31445a}
+.theme-black .return-summary span,.theme-black .return-report-head span{color:#9db0c5}
+.theme-black .return-report{border-color:#69b9ff}
+.theme-black .badge-sewing{background:#183a5b;color:#69b9ff;border-color:#315f87}
+.theme-black .badge-sent{background:#173c2a;color:#69d49a;border-color:#2b7650}
+@media(max-width:600px){
+ .return-summary{grid-template-columns:1fr}
+ .return-report-head{align-items:flex-start}
+ .return-qty{width:72px;min-width:72px}
+ .return-btn{padding:8px 9px;font-size:11px}
+}
