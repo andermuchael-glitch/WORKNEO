@@ -220,3 +220,10 @@ html.theme-black,html.theme-black body,body.theme-black{background:#182230!impor
  .flow-cards>div{min-width:0}
  .flow-cards>div:nth-child(4),.flow-cards>div:nth-child(8){display:none}
 }
+
+.tracking-actions .secondary-action.active{border-color:#1769e0;background:#eaf3ff;color:#0f4fae;box-shadow:0 0 0 2px #1769e01a}
+.tracking-separation-panel{margin-top:18px}
+.tracking-separation-panel .separation-live{min-width:190px}
+.tracking-separation-panel .status-filters{margin:12px 0}
+.tracking-separation-panel .status-filters button{cursor:pointer}
+.theme-black .tracking-actions .secondary-action.active{background:#183b61;border-color:#69b9ff;color:#fff}
