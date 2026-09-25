@@ -182,3 +182,41 @@ html.theme-black,html.theme-black body,body.theme-black{background:#182230!impor
 .seamstress-item-qty{flex:0 0 68px}
 @media(max-width:1100px){.seamstress-summary-grid{grid-template-columns:repeat(2,minmax(280px,1fr))}}
 @media(max-width:720px){.seamstress-summary-grid{grid-template-columns:1fr}.seamstress-card{max-width:none}.seamstress-metrics{gap:8px}.summary-metric{min-height:72px}.summary-metric b{font-size:20px}.summary-metric small{font-size:9px}}
+
+
+/* Aba SEPARAÇÃO — retornos da costura e conferência */
+.separation-panel{overflow:hidden}
+.separation-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0;padding:12px;border:1px solid #dce5ef;border-radius:12px;background:#f7faff}
+.separation-stat{min-width:150px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border:1px solid #dce5ef;border-radius:9px;background:#fff}
+.separation-stat span{font-size:10px;font-weight:900;letter-spacing:.06em;color:#64748b}
+.separation-stat b{font-size:18px;color:#1769e0}
+.separation-toolbar .secondary-action{margin-left:auto}
+.separation-table{margin-top:14px}
+.separation-table table{min-width:900px}
+.small-action{font-size:10px!important;padding:8px 10px!important;white-space:nowrap}
+.archived-separation{margin-top:20px;padding-top:18px;border-top:1px solid #dfe6ef}
+.separation-flow{margin-top:16px}
+.flow-cards{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.flow-cards>div{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:125px;min-height:60px;padding:10px 14px;border:1px solid #dce5ef;border-radius:12px;background:#f8fafc;text-align:center}
+.flow-cards>div:not(:has(b)){border:0;background:transparent;min-width:20px;font-size:22px;color:#69b9ff}
+.flow-cards b{font-size:12px;color:#1769e0}
+.flow-cards span{font-size:10px;color:#64748b;margin-top:3px}
+.theme-black .separation-toolbar{background:#1c2b3a;border-color:#30445a}
+.theme-black .separation-stat{background:#243141;border-color:#35485d}
+.theme-black .separation-stat span{color:#a9bbce}
+.theme-black .separation-stat b{color:#69b9ff}
+.theme-black .archived-separation{border-color:#30445a}
+.theme-black .flow-cards>div{background:#1b2a3a;border-color:#35485d}
+.theme-black .flow-cards>div:not(:has(b)){background:transparent;border:0}
+.theme-black .flow-cards span{color:#a9bbce}
+@media(max-width:800px){
+ .separation-toolbar{align-items:stretch}
+ .separation-stat{flex:1 1 180px}
+ .separation-toolbar .primary,.separation-toolbar .secondary-action{flex:1 1 220px;margin-left:0}
+}
+@media(max-width:600px){
+ .separation-table{overflow-x:auto}
+ .flow-cards{display:grid;grid-template-columns:1fr 28px 1fr;gap:7px}
+ .flow-cards>div{min-width:0}
+ .flow-cards>div:nth-child(4),.flow-cards>div:nth-child(8){display:none}
+}
