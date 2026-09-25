@@ -44,7 +44,7 @@ export function filterProductionRows(share,filters){
     if(filters.listId && r.listId!==filters.listId) continue;
     for(const item of (r.items||[])){
       if(filters.product && item.product!==filters.product) continue;
-      rows.push({date,costureira:r.costureira,createdBy:r.createdBy||{},listId:r.listId,listName:r.listName,product:item.product,color:item.color||'',pedido:item.pedido||'',qty:Number(item.qty)||0});
+      rows.push({date,costureira:r.costureira,createdBy:r.createdBy||{},listId:r.listId,listName:r.listName,product:item.product,color:item.color||'',pedido:item.pedido||'',cliente:item.cliente||r.cliente||item.customer||r.customer||'',tracking:item.tracking||item.codigoAcompanhamento||r.tracking||r.codigoAcompanhamento||'',qty:Number(item.qty)||0});
     }
   }
   return rows;
