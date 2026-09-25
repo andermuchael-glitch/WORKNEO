@@ -535,4 +535,7 @@ function PublicShareEntry(){
  return <PublicShare data={data} loading={loading} error={error} filters={filters} setFilters={setFilters}/>;
 }
 const hasPublicShare=new URLSearchParams(window.location.search).has('acompanhamento');
-createRoot(document.getElementById('root')).render(hasPublicShare?<PublicShareErrorBoundary><PublicShareEntry/></PublicShareErrorBoundary>:<AppErrorBoundary><App/></AppErrorBoundary>);
+const workneoRoot=document.getElementById('root');
+const workneoAppRoot=createRoot(workneoRoot);
+workneoAppRoot.render(hasPublicShare?<PublicShareErrorBoundary><PublicShareEntry/></PublicShareErrorBoundary>:<AppErrorBoundary><App/></AppErrorBoundary>);
+requestAnimationFrame(()=>workneoRoot?.setAttribute('data-rendered','true'));
