@@ -38,7 +38,7 @@ const simpleMaterialHtml=(materials,title,fn)=>{const rows=materialRows(material
 function PublicShare({data,loading,error,filters,setFilters}){
  const reports=Array.isArray(data?.reports)?data.reports:[],lists=Array.isArray(data?.lists)?data.lists:[],share=data?.share||{};
  const search=String(filters.search||'').trim().toLowerCase();
- const onlySewing=Boolean(filters.onlySewing);
+ const onlySewing=Boolean(filters.onlySewing),showPending=Boolean(filters.showPending);
  const products=useMemo(()=>[...new Set(reports.flatMap(r=>(r.items||[]).map(i=>i.product).filter(Boolean)))].sort(),[reports]);
  const costureiras=useMemo(()=>[...new Set(reports.map(r=>r.costureira).filter(Boolean))].sort(),[reports]);
  const baseRows=useMemo(()=>{
@@ -115,9 +115,10 @@ function PublicShare({data,loading,error,filters,setFilters}){
        if(!hay.includes(search))return false;
      }
      if(onlySewing&&o.sent<=0)return false;
+     if(showPending&&o.pending<=0)return false;
      return true;
    }).sort((a,b)=>String(a.pedido).localeCompare(String(b.pedido),undefined,{numeric:true}));
- },[baseRows,pendingItems,search,onlySewing]);
+ },[baseRows,pendingItems,search,onlySewing,showPending]);
  const [expandedOrder,setExpandedOrder]=useState('');
  const [materialsOpen,setMaterialsOpen]=useState(false);
  const filteredReports=useMemo(()=>reports.filter(r=>{
