@@ -61,19 +61,14 @@ function PublicShare({data,loading,error,filters,setFilters}){
        else original.set(key,{key,listId:l.id,listName:l.name,product:item.product,color,pedido,cliente:item.cliente||item.customer||'',tracking:item.tracking||item.codigoAcompanhamento||'',original:Number(item.qty||0)});
      }
    }
-   const sent=new Map();
-   for(const row of baseRows){
-     const key=[row.listId,row.product,row.color||'SEM COR',row.pedido||'SEM PEDIDO'].join('|');
-     sent.set(key,(sent.get(key)||0)+Number(row.qty||0));
-   }
-   return [...original.values()].map(item=>({...item,sent:Math.min(item.original,sent.get(item.key)||0),pending:Math.max(0,item.original-(sent.get(item.key)||0))})).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));
+   return [...original.values()].map(item=>({...item,sent:0,pending:item.original})).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));
  },[lists,baseRows,filters.listId,filters.product]);
  const rows=useMemo(()=>{
    const q=search;
    return baseRows.filter(row=>{
      const hay=[row.pedido,row.product,row.costureira,row.listName,row.cliente,row.tracking,row.createdBy?.name,row.createdBy?.email].join(' ').toLowerCase();
      if(q&&!hay.includes(q))return false;
-     if(onlySewing&&Number(row.qty||0)<=0)return false;
+     if(onlySewing&&Number(row.sewingQty||0)<=0)return false;
      return true;
    });
  },[baseRows,search,onlySewing]);
@@ -84,7 +79,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
      return hay.includes(search);
    });
  },[pendingItems,search]);
- const total=rows.reduce((s,r)=>s+r.qty,0);
+ const total=rows.reduce((s,r)=>s+Number(r.sewingQty||0),0);
  const pendingTotal=filteredPending.reduce((s,r)=>s+r.pending,0);
  const sentByKey=useMemo(()=>{
    const m=new Map();
@@ -100,12 +95,12 @@ function PublicShare({data,loading,error,filters,setFilters}){
      const key=pedido||'SEM PEDIDO';
      const old=map.get(key);
      if(old){Object.assign(old,patch);return old}
-     const item={pedido:key,cliente:patch.cliente||'',tracking:patch.tracking||'',sent:0,pending:0,colors:new Set(),sentRows:[],pendingItems:[]};
+     const item={pedido:key,cliente:patch.cliente||'',tracking:patch.tracking||'',sent:0,sewing:0,returned:0,pending:0,colors:new Set(),sentRows:[],pendingItems:[]};
      Object.assign(item,patch);map.set(key,item);return item;
    };
    for(const r of baseRows){
      const o=add(r.pedido||'SEM PEDIDO',{cliente:r.cliente||'',tracking:r.tracking||''});
-     o.sent+=Number(r.qty||0);o.sentRows.push(r);if(r.color)o.colors.add(r.color);
+     o.sent+=Number(r.qty||0);o.sewing+=Number(r.sewingQty||0);o.returned+=Number(r.returnedQty||0);o.sentRows.push(r);if(r.color)o.colors.add(r.color);
    }
    for(const p of pendingItems){
      const o=add(p.pedido,{cliente:p.cliente||'',tracking:p.tracking||''});
@@ -116,7 +111,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
        const hay=[o.pedido,o.cliente,o.tracking,...o.sentRows.map(r=>[r.product,r.listName,r.costureira].join(' ')),...o.pendingItems.map(r=>[r.product,r.color,r.listName].join(' '))].join(' ').toLowerCase();
        if(!hay.includes(search))return false;
      }
-     if(onlySewing&&o.sent<=0)return false;
+     if(onlySewing&&o.sewing<=0)return false;
      if(showPending&&o.pending<=0)return false;
      return true;
    }).sort((a,b)=>String(a.pedido).localeCompare(String(b.pedido),undefined,{numeric:true}));
@@ -146,14 +141,14 @@ function PublicShare({data,loading,error,filters,setFilters}){
    }
    return [...map.values()].sort((a,b)=>a.material.localeCompare(b.material)||a.spec.localeCompare(b.spec)||a.color.localeCompare(b.color));
  },[filteredReports,filters.product]);
- const statusFor=o=>o.pending>0?(o.sent>0?'PARCIAL':'PENDENTE'):'ENVIADO';
+ const statusFor=o=>o.sewing>0?(o.pending>0?'PARCIAL':'NA COSTURA'):(o.pending>0?'PENDENTE':'RETORNADO');
  const setFilter=(patch)=>setFilters({...filters,...patch});
  const resetFilters=()=>setFilters({startDate:'',endDate:'',costureira:share.share_type==='seamstress'?(share.costureira||''):'',product:'',listId:share.share_type==='list'?(share.list_id||''):'',search:'',onlySewing:false});
  const scrollTo=id=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
  const csvEscape=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
  const exportCsv=()=>{
-   const header=['DATA','PRODUTO','QUANTIDADE','COR','Nº PEDIDO','CLIENTE','ACOMPANHAMENTO','COSTUREIRA','LISTA','LANÇADO POR'];
-   const body=rows.map(r=>[r.date,r.product,r.qty,r.color,r.pedido,r.cliente,r.tracking,r.costureira,r.listName,r.createdBy?.name||r.createdBy?.email||'']);
+   const header=['DATA','PRODUTO','ENVIADO','RETORNOU','NA COSTURA','COR','Nº PEDIDO','CLIENTE','ACOMPANHAMENTO','COSTUREIRA','LISTA','LANÇADO POR'];
+   const body=rows.map(r=>[r.date,r.product,r.qty,r.returnedQty,r.sewingQty,r.color,r.pedido,r.cliente,r.tracking,r.costureira,r.listName,r.createdBy?.name||r.createdBy?.email||'']);
    const pendingHeader=['COR','PRODUTO','Nº PEDIDO','LISTA','PENDENTE'];
    const pendingBody=filteredPending.map(p=>[p.color,p.product,p.pedido,p.listName,p.pending]);
    const csv=[header,...body,[],pendingHeader,...pendingBody].map(row=>row.map(csvEscape).join(';')).join('\r\n');
@@ -197,7 +192,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    </section>
 
    <section className="summary-grid tracking-summary">
-     <div className="summary-card"><span>PEÇAS ENVIADAS</span><b>{fmt(total)}</b><small>nos filtros atuais</small></div>
+     <div className="summary-card"><span>PEÇAS NA COSTURA</span><b>{fmt(total)}</b><small>saldo atual nos filtros</small></div>
      <div className="summary-card"><span>PENDENTES</span><b>{fmt(pendingTotal)}</b><small>aguardando costura</small></div>
      <div className="summary-card"><span>PEDIDOS</span><b>{orders.length}</b><small>encontrados</small></div>
      <div className="summary-card"><span>MATÉRIAS-PRIMAS</span><b>{fmt(materialTotals.length)}</b><small>tipos calculados</small></div>
@@ -210,11 +205,11 @@ function PublicShare({data,loading,error,filters,setFilters}){
        return <article className={'order-card '+(open?'expanded':'')} key={order.pedido}>
          <button className="order-header" onClick={()=>setExpandedOrder(open?'':order.pedido)} aria-expanded={open}>
            <div className="order-main"><strong>{order.pedido==='SEM PEDIDO'?'Pedido sem número':'Pedido '+order.pedido}</strong>{order.cliente&&<span>{order.cliente}</span>}{order.tracking&&<small>🔗 {order.tracking}</small>}</div>
-           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase()}>{status==='ENVIADO'?'✓ Enviado para Costura':status==='PARCIAL'?'↗ Envio Parcial':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sent+order.pending)} peças</b><span className="chevron">{open?'▲':'▼'}</span></div>
+           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase().replace(/\s+/g,'-')}>{status==='NA COSTURA'?'✓ Na Costura':status==='PARCIAL'?'↗ Parcial — Costura + Pendente':status==='RETORNADO'?'↩ Retornado à Separação':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sewing+order.pending)} peças</b><span className="chevron">{open?'▲':'▼'}</span></div>
          </button>
          {open&&<div className="order-details">
-           <div className="detail-grid"><div><span>ENVIADO À COSTURA</span><b>{fmt(order.sent)}</b></div><div><span>PENDENTE</span><b>{fmt(order.pending)}</b></div><div><span>CORES</span><b>{[...order.colors].join(', ')||'—'}</b></div></div>
-           {order.sentRows.length>0&&<div className="detail-block"><h3>✓ Enviado para Costura</h3><div className="table-wrap compact"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>COSTUREIRA</th><th>DATA</th></tr></thead><tbody>{order.sentRows.map((r,i)=><tr key={i}><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{r.color||'—'}</td><td>{r.costureira||'—'}</td><td>{fmtDate(r.date)}</td></tr>)}</tbody></table></div></div>}
+           <div className="detail-grid"><div><span>ENVIADO À COSTURA</span><b>{fmt(order.sent)}</b></div><div><span>NA COSTURA</span><b>{fmt(order.sewing)}</b></div><div><span>RETORNOU</span><b>{fmt(order.returned)}</b></div><div><span>PENDENTE</span><b>{fmt(order.pending)}</b></div><div><span>CORES</span><b>{[...order.colors].join(', ')||'—'}</b></div></div>
+           {order.sentRows.length>0&&<div className="detail-block"><h3>✓ Enviado para Costura</h3><div className="table-wrap compact"><table><thead><tr><th>PRODUTO</th><th>ENVIADO</th><th>RETORNOU</th><th>NA COSTURA</th><th>COR</th><th>COSTUREIRA</th><th>DATA</th></tr></thead><tbody>{order.sentRows.map((r,i)=><tr key={i}><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{fmt(r.returnedQty)}</td><td><b>{fmt(r.sewingQty)}</b></td><td>{r.color||'—'}</td><td>{r.costureira||'—'}</td><td>{fmtDate(r.date)}</td></tr>)}</tbody></table></div></div>}
            {order.pendingItems.length>0&&<div className="detail-block"><h3>⏳ Ainda pendente</h3><div className="pending-mini">{order.pendingItems.map((p,i)=><div className="pending-line" key={p.key+'-'+i}><span className="color-dot">{p.color}</span><b>{p.product}</b><span>{fmt(p.pending)} peças</span>{p.listName&&<small>{p.listName}</small>}</div>)}</div></div>}
          </div>}
        </article>
@@ -237,7 +232,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    <section className="panel" id="resumo">
      <button className="collapsible-header" onClick={()=>setSummaryOpen(v=>!v)} aria-expanded={summaryOpen}><span>📊 Resumo por produto e dia de envio</span><span>{summaryOpen?'▲':'▼'}</span></button>
      {!summaryOpen?<div className="collapsed-summary">Resumo minimizado. Toque para visualizar produto, quantidade, cor, pedido e costureira por dia de envio.</div>:<div className="collapsible-content">
-       {rows.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>COR</th><th>PEDIDO</th><th>COSTUREIRA</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{r.color||'—'}</td><td>{r.pedido||'—'}</td><td>{r.costureira||'—'}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada.</div>}
+       {rows.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>ENVIADO</th><th>RETORNOU</th><th>NA COSTURA</th><th>COR</th><th>PEDIDO</th><th>COSTUREIRA</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{fmt(r.returnedQty)}</td><td><b>{fmt(r.sewingQty)}</b></td><td>{r.color||'—'}</td><td>{r.pedido||'—'}</td><td>{r.costureira||'—'}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada.</div>}
      </div>}
    </section>
 
