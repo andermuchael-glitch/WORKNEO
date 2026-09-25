@@ -47,23 +47,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    const clean={...filters};delete clean.search;delete clean.onlySewing;
    return filterProductionRows(data,clean);
  },[data,filters.startDate,filters.endDate,filters.costureira,filters.listId,filters.product]);
- const pendingItems=useMemo(()=>{
-   const original=new Map();
-   for(const l of lists){
-     if(filters.listId&&l.id!==filters.listId)continue;
-     for(const item of (l.items||[])){
-       if(filters.product&&item.product!==filters.product)continue;
-       const color=item.color||'SEM COR';
-       const pedido=item.pedido||'SEM PEDIDO';
-       const key=[l.id,item.product,color,pedido].join('|');
-       const old=original.get(key);
-       if(old)old.original+=Number(item.qty||0);
-       else original.set(key,{key,listId:l.id,listName:l.name,product:item.product,color,pedido,cliente:item.cliente||item.customer||'',tracking:item.tracking||item.codigoAcompanhamento||'',original:Number(item.qty||0)});
-     }
-   }
-   return [...original.values()].map(item=>({...item,sent:0,pending:item.original})).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));
- },[lists,baseRows,filters.listId,filters.product]);
- const rows=useMemo(()=>{
+ const pendingItems=useMemo(()=>{\n   // Retorno à separação não significa novo "pendente de envio".\n   // A lista volta a conter as peças fisicamente, mas o histórico de retorno\n   // deve ser descontado do saldo que ainda nunca foi enviado à costura.\n   const returnedByKey=new Map();\n   for(const r of baseRows){\n     const key=[r.listId,r.product,r.color||'SEM COR',r.pedido||'SEM PEDIDO'].join('|');\n     returnedByKey.set(key,(returnedByKey.get(key)||0)+Number(r.returnedQty||0));\n   }\n   const original=new Map();\n   for(const l of lists){\n     if(filters.listId&&l.id!==filters.listId)continue;\n     for(const item of (l.items||[])){\n       if(filters.product&&item.product!==filters.product)continue;\n       const color=item.color||'SEM COR';\n       const pedido=item.pedido||'SEM PEDIDO';\n       const key=[l.id,item.product,color,pedido].join('|');\n       const old=original.get(key);\n       if(old)old.original+=Number(item.qty||0);\n       else original.set(key,{key,listId:l.id,listName:l.name,product:item.product,color,pedido,cliente:item.cliente||item.customer||'',tracking:item.tracking||item.codigoAcompanhamento||'',original:Number(item.qty||0)});\n     }\n   }\n   return [...original.values()].map(item=>{\n     const returned=returnedByKey.get(item.key)||0;\n     return {...item,returned,pending:Math.max(0,item.original-returned)};\n   }).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));\n },[lists,baseRows,filters.listId,filters.product]);\n const rows=useMemo(()=>{
    const q=search;
    return baseRows.filter(row=>{
      const hay=[row.pedido,row.product,row.costureira,row.listName,row.cliente,row.tracking,row.createdBy?.name,row.createdBy?.email].join(' ').toLowerCase();
@@ -205,7 +189,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
        return <article className={'order-card '+(open?'expanded':'')} key={order.pedido}>
          <button className="order-header" onClick={()=>setExpandedOrder(open?'':order.pedido)} aria-expanded={open}>
            <div className="order-main"><strong>{order.pedido==='SEM PEDIDO'?'Pedido sem número':'Pedido '+order.pedido}</strong>{order.cliente&&<span>{order.cliente}</span>}{order.tracking&&<small>🔗 {order.tracking}</small>}</div>
-           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase().replace(/\s+/g,'-')}>{status==='NA COSTURA'?'✓ Na Costura':status==='PARCIAL'?'↗ Parcial — Costura + Pendente':status==='RETORNADO'?'↩ Retornado à Separação':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sewing+order.pending)} peças</b><span className="chevron">{open?'▲':'▼'}</span></div>
+           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase().replace(/\s+/g,'-')}>{status==='NA COSTURA'?'✓ Na Costura':status==='PARCIAL'?'↗ Parcial — Costura + Pendente':status==='RETORNADO'?'↩ Retornado à Separação':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sewing+order.returned+order.pending)} peças</b><span className="chevron">{open?'▲':'▼'}</span></div>
          </button>
          {open&&<div className="order-details">
            <div className="detail-grid"><div><span>ENVIADO À COSTURA</span><b>{fmt(order.sent)}</b></div><div><span>NA COSTURA</span><b>{fmt(order.sewing)}</b></div><div><span>RETORNOU</span><b>{fmt(order.returned)}</b></div><div><span>PENDENTE</span><b>{fmt(order.pending)}</b></div><div><span>CORES</span><b>{[...order.colors].join(', ')||'—'}</b></div></div>
