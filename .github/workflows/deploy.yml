@@ -24,11 +24,13 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build
-      - run: |
+      - name: Prepare GitHub Pages files
+        run: |
           cp manifest.webmanifest dist/manifest.webmanifest
           cp sw.js dist/sw.js
           cp icon.svg dist/icon.svg
-          cp index.html dist/404.html
+          cp dist/index.html dist/404.html
+          cmp -s dist/index.html dist/404.html
       - run: test -f dist/index.html && test -f dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
