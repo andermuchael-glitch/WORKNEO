@@ -124,6 +124,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const [expandedOrder,setExpandedOrder]=useState('');
  const [materialsOpen,setMaterialsOpen]=useState(false);
  const [summaryOpen,setSummaryOpen]=useState(false);
+ const [historyOpen,setHistoryOpen]=useState(false);
  const filteredReports=useMemo(()=>reports.filter(r=>{
    const date=String(r.date||'');
    const start=filters.startDate||'0000-01-01',end=filters.endDate||'9999-12-31';
@@ -241,8 +242,10 @@ function PublicShare({data,loading,error,filters,setFilters}){
    </section>
 
    <section className="panel" id="relatorios">
-     <div className="section-head"><div><div className="eyebrow">📄 HISTÓRICO</div><h2>Relatórios feitos</h2><p>Cada envio fica disponível para consulta.</p></div></div>
-     {filteredReports.length?<div className="saved-list">{filteredReports.map(r=>{const q=(r.items||[]).reduce((s,x)=>s+n(x.qty),0);return <article className="saved" key={r.id}><button className="report-toggle" onClick={()=>setExpandedOrder(expandedOrder===('report-'+r.id)?'':'report-'+r.id)}><span><b>{r.costureira}</b><small>{r.listName} · {fmtDate(r.date)} · {fmt(q)} peças</small></span><span>{expandedOrder===('report-'+r.id)?'▲':'▼'}</span></button>{expandedOrder===('report-'+r.id)&&<div className="report-expanded"><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>PEDIDO</th><th>LANÇADO POR</th></tr></thead><tbody>{(r.items||[]).map((x,i)=><tr key={i}><td>{x.product}</td><td>{fmt(x.qty)}</td><td>{x.color||'—'}</td><td>{x.pedido||'—'}</td><td>{x.createdBy?.name||x.createdBy?.email||'—'}</td></tr>)}</tbody></table></div></div>}</article>})}</div>:<div className="empty">Nenhum relatório encontrado.</div>}
+     <button className="collapsible-header history-header" onClick={()=>setHistoryOpen(v=>!v)} aria-expanded={historyOpen}><span>📄 HISTÓRICO · Relatórios feitos</span><span>{historyOpen?'▲':'▼'}</span></button>
+     {!historyOpen?<div className="collapsed-summary">Histórico minimizado · {filteredReports.length} relatório(s) disponível(is). Toque para consultar.</div>:<div className="collapsible-content history-content">
+       {filteredReports.length?<div className="saved-list">{filteredReports.map(r=>{const q=(r.items||[]).reduce((s,x)=>s+n(x.qty),0);return <article className="saved" key={r.id}><button className="report-toggle" onClick={()=>setExpandedOrder(expandedOrder===('report-'+r.id)?'':'report-'+r.id)}><span><b>{r.costureira}</b><small>{r.listName} · {fmtDate(r.date)} · {fmt(q)} peças</small></span><span>{expandedOrder===('report-'+r.id)?'▲':'▼'}</span></button>{expandedOrder===('report-'+r.id)&&<div className="report-expanded"><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>PEDIDO</th><th>LANÇADO POR</th></tr></thead><tbody>{(r.items||[]).map((x,i)=><tr key={i}><td>{x.product}</td><td>{fmt(x.qty)}</td><td>{x.color||'—'}</td><td>{x.pedido||'—'}</td><td>{x.createdBy?.name||x.createdBy?.email||'—'}</td></tr>)}</tbody></table></div></div>}</article>})}</div>:<div className="empty">Nenhum relatório encontrado.</div>}
+     </div>}
    </section>
  </main>;
 }
