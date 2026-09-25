@@ -162,8 +162,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    const body=rows.map(r=>[r.date,r.product,r.qty,r.returnedQty,r.sewingQty,r.color,r.pedido,r.cliente,r.tracking,r.costureira,r.listName,r.createdBy?.name||r.createdBy?.email||'']);
    const pendingHeader=['COR','PRODUTO','Nº PEDIDO','LISTA','PENDENTE'];
    const pendingBody=filteredPending.map(p=>[p.color,p.product,p.pedido,p.listName,p.pending]);
-   const csv=[header,...body,[],pendingHeader,...pendingBody].map(row=>row.map(csvEscape).join(';')).join('\r
-');
+   const csv=[header,...body,[],pendingHeader,...pendingBody].map(row=>row.map(csvEscape).join(';')).join('\\r\\n');
    const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8;'});
    const url=URL.createObjectURL(blob),a=document.createElement('a');
    a.href=url;a.download='WORKNEO-acompanhamento-'+today()+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
