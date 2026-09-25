@@ -144,3 +144,23 @@ html.theme-black,html.theme-black body,body.theme-black{background:#182230!impor
  .return-qty{width:72px;min-width:72px}
  .return-btn{padding:8px 9px;font-size:11px}
 }
+
+
+/* Painel inteligente por costureira */
+.seamstress-summary-grid{align-items:start}
+.seamstress-card{padding:0;overflow:hidden;transition:box-shadow .18s ease,transform .18s ease}
+.seamstress-card.is-open{box-shadow:0 10px 28px #14213d1c}
+.summary-card-head{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:transparent;color:#536987;text-align:left;font-size:21px;padding:20px 20px 8px;cursor:pointer}
+.summary-card-head:hover{color:#1769e0}.summary-card-head:focus-visible{outline:3px solid #69b9ff;outline-offset:-3px}.summary-chevron{font-size:13px;color:#1769e0}
+.seamstress-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 14px 16px}
+.summary-metric{border:1px solid #dce4ee;background:#f8fafc;border-radius:10px;padding:9px 6px;cursor:pointer;transition:.15s;min-width:0}
+.summary-metric:hover,.summary-metric.active{border-color:#69b9ff;background:#eef7ff;transform:translateY(-1px)}
+.summary-metric b{display:block;font-size:20px;color:#101b2d}.summary-metric small{display:block;margin-top:3px;font-size:9px;font-weight:800;color:#60738f;line-height:1.15}
+.summary-metric.returned b{color:#16805a}.summary-metric.remaining b{color:#b66a00}
+.seamstress-details{border-top:1px solid #e1e6ee;background:#f8fafc;padding:14px}
+.seamstress-detail-title{font-size:12px;font-weight:900;color:#31445f;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}.seamstress-detail-title span{font-weight:700}
+.seamstress-items{display:grid;gap:8px;max-height:330px;overflow:auto}
+.seamstress-item{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#fff;border:1px solid #e1e6ee;border-radius:10px;padding:10px}
+.seamstress-item>div:first-child{min-width:0}.seamstress-item b,.seamstress-item span{display:block}.seamstress-item b{font-size:13px;color:#172033}.seamstress-item span{font-size:11px;color:#657792;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.seamstress-item-qty{min-width:62px;text-align:right;font-size:18px;font-weight:900}.seamstress-item-qty small{display:block;font-size:8px;color:#6c7d94;margin-top:2px}
+.theme-black .summary-card-head{color:#c4d2e4}.theme-black .summary-metric{background:#1b2a3a;border-color:#30445a}.theme-black .summary-metric:hover,.theme-black .summary-metric.active{background:#20384e;border-color:#69b9ff}.theme-black .summary-metric b{color:#f4f8fc}.theme-black .seamstress-details{background:#1b2a3a;border-color:#30445a}.theme-black .seamstress-item{background:#243141;border-color:#35485d}.theme-black .seamstress-item b{color:#f4f8fc}.theme-black .seamstress-item span,.theme-black .seamstress-detail-title{color:#b8c7d9}
+@media(max-width:520px){.seamstress-metrics{grid-template-columns:1fr 1fr 1fr;padding-left:9px;padding-right:9px}.summary-metric{padding:8px 3px}.summary-metric b{font-size:17px}.summary-metric small{font-size:8px}.summary-card-head{padding:16px 14px 6px;font-size:18px}.seamstress-item{align-items:flex-start}.seamstress-item-qty{min-width:52px}.seamstress-detail-title{flex-direction:column;gap:3px}}
