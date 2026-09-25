@@ -37,42 +37,89 @@ const matrixHtml=(materials,title)=>{const rows=materialRows(materials,x=>!NO_CO
 const simpleMaterialHtml=(materials,title,fn)=>{const rows=materialRows(materials,fn);if(!rows.length)return'<h3>'+title+'</h3><p>Nenhum material.</p>';const map=new Map();for(const x of rows){const k=x.material+'|'+x.unit;let g=map.get(k);if(!g)g={material:x.material,unit:x.unit,specs:new Set(),qty:0};if(x.spec)g.specs.add(x.spec);g.qty+=x.qty;map.set(k,g)}const body=[...map.values()].map(g=>'<tr><td>'+g.material+'</td><td>'+[...g.specs].join(' · ')+'</td><td>'+fmt(g.qty)+' '+g.unit+'</td></tr>').join('');return'<h3>'+title+'</h3><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>TOTAL</th></tr></thead><tbody>'+body+'</tbody></table>';};
 function PublicShare({data,loading,error,filters,setFilters}){
  const reports=Array.isArray(data?.reports)?data.reports:[],lists=Array.isArray(data?.lists)?data.lists:[],share=data?.share||{};
- const products=useMemo(()=>[...new Set(reports.flatMap(r=>(r.items||[]).map(i=>i.product)))].sort(),[reports]);
+ const search=String(filters.search||'').trim().toLowerCase();
+ const onlySewing=Boolean(filters.onlySewing);
+ const products=useMemo(()=>[...new Set(reports.flatMap(r=>(r.items||[]).map(i=>i.product).filter(Boolean)))].sort(),[reports]);
  const costureiras=useMemo(()=>[...new Set(reports.map(r=>r.costureira).filter(Boolean))].sort(),[reports]);
- const rows=useMemo(()=>filterProductionRows(data,filters),[data,filters]);
- const total=rows.reduce((s,r)=>s+r.qty,0);
- const grouped=useMemo(()=>{const m=new Map();for(const r of rows){const k=r.date+'|'+r.product;const old=m.get(k);if(old)old.qty+=r.qty;else m.set(k,{date:r.date,product:r.product,qty:r.qty})}return[...m.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.product.localeCompare(b.product))},[rows]);
- const pendingProducts=useMemo(()=>{
+ const baseRows=useMemo(()=>{
+   const clean={...filters};delete clean.search;delete clean.onlySewing;
+   return filterProductionRows(data,clean);
+ },[data,filters.startDate,filters.endDate,filters.costureira,filters.listId,filters.product]);
+ const pendingItems=useMemo(()=>{
    const original=new Map();
    for(const l of lists){
      if(filters.listId&&l.id!==filters.listId)continue;
-     for(const i of (l.items||[])){
-       if(filters.product&&i.product!==filters.product)continue;
-       const key=i.product;
-       original.set(key,(original.get(key)||0)+Number(i.qty||0));
+     for(const item of (l.items||[])){
+       if(filters.product&&item.product!==filters.product)continue;
+       const color=item.color||'SEM COR';
+       const pedido=item.pedido||'SEM PEDIDO';
+       const key=[l.id,item.product,color,pedido].join('|');
+       const old=original.get(key);
+       if(old)old.original+=Number(item.qty||0);
+       else original.set(key,{key,listId:l.id,listName:l.name,product:item.product,color,pedido,cliente:item.cliente||item.customer||'',tracking:item.tracking||item.codigoAcompanhamento||'',original:Number(item.qty||0)});
      }
    }
    const sent=new Map();
-   for(const r of rows)sent.set(r.product,(sent.get(r.product)||0)+r.qty);
-   return [...original.entries()].map(([product,qty])=>({product,original:qty,sent:sent.get(product)||0,pending:Math.max(0,qty-(sent.get(product)||0))})).filter(x=>x.pending>0).sort((a,b)=>b.pending-a.pending||a.product.localeCompare(b.product));
- },[lists,rows,filters.listId,filters.product]);
- const pendingLists=useMemo(()=>{
-   return lists.map(l=>{
-     if(filters.listId&&l.id!==filters.listId)return null;
-     const pendingItems=(l.items||[]).map(item=>{
-       const original=Number(item.qty||0);
-       const sent=rows.filter(r=>r.listId===l.id&&r.product===item.product).reduce((sum,r)=>sum+r.qty,0);
-       return {...item,original,sent,pending:Math.max(0,original-sent)};
-     }).filter(item=>item.pending>0);
-     const pending=pendingItems.reduce((sum,item)=>sum+item.pending,0);
-     const sentQty=(l.items||[]).reduce((sum,item)=>{
-       const original=Number(item.qty||0);
-       const sent=rows.filter(r=>r.listId===l.id&&r.product===item.product).reduce((s,r)=>s+r.qty,0);
-       return sum+Math.min(original,sent);
-     },0);
-     return pending>0?{...l,pendingItems,pending,sentQty}:null;
-   }).filter(Boolean);
- },[lists,rows,filters.listId]);
+   for(const row of baseRows){
+     const key=[row.listId,row.product,row.color||'SEM COR',row.pedido||'SEM PEDIDO'].join('|');
+     sent.set(key,(sent.get(key)||0)+Number(row.qty||0));
+   }
+   return [...original.values()].map(item=>({...item,sent:Math.min(item.original,sent.get(item.key)||0),pending:Math.max(0,item.original-(sent.get(item.key)||0))})).filter(x=>x.pending>0).sort((a,b)=>norm(a.color).localeCompare(norm(b.color))||a.product.localeCompare(b.product)||a.pedido.localeCompare(b.pedido));
+ },[lists,baseRows,filters.listId,filters.product]);
+ const rows=useMemo(()=>{
+   const q=search;
+   return baseRows.filter(row=>{
+     const hay=[row.pedido,row.product,row.costureira,row.listName,row.cliente,row.tracking,row.createdBy?.name,row.createdBy?.email].join(' ').toLowerCase();
+     if(q&&!hay.includes(q))return false;
+     if(onlySewing&&Number(row.qty||0)<=0)return false;
+     return true;
+   });
+ },[baseRows,search,onlySewing]);
+ const filteredPending=useMemo(()=>{
+   return pendingItems.filter(item=>{
+     if(!search)return true;
+     const hay=[item.pedido,item.product,item.color,item.listName,item.cliente,item.tracking].join(' ').toLowerCase();
+     return hay.includes(search);
+   });
+ },[pendingItems,search]);
+ const total=rows.reduce((s,r)=>s+r.qty,0);
+ const pendingTotal=filteredPending.reduce((s,r)=>s+r.pending,0);
+ const sentByKey=useMemo(()=>{
+   const m=new Map();
+   for(const r of baseRows){
+     const key=[r.listId,r.product,r.color||'SEM COR',r.pedido||'SEM PEDIDO'].join('|');
+     m.set(key,(m.get(key)||0)+Number(r.qty||0));
+   }
+   return m;
+ },[baseRows]);
+ const orders=useMemo(()=>{
+   const map=new Map();
+   const add=(pedido,patch)=>{
+     const key=pedido||'SEM PEDIDO';
+     const old=map.get(key);
+     if(old){Object.assign(old,patch);return old}
+     const item={pedido:key,cliente:patch.cliente||'',tracking:patch.tracking||'',sent:0,pending:0,colors:new Set(),sentRows:[],pendingItems:[]};
+     Object.assign(item,patch);map.set(key,item);return item;
+   };
+   for(const r of baseRows){
+     const o=add(r.pedido||'SEM PEDIDO',{cliente:r.cliente||'',tracking:r.tracking||''});
+     o.sent+=Number(r.qty||0);o.sentRows.push(r);if(r.color)o.colors.add(r.color);
+   }
+   for(const p of pendingItems){
+     const o=add(p.pedido,{cliente:p.cliente||'',tracking:p.tracking||''});
+     o.pending+=p.pending;o.pendingItems.push(p);if(p.color)o.colors.add(p.color);
+   }
+   return [...map.values()].filter(o=>{
+     if(search){
+       const hay=[o.pedido,o.cliente,o.tracking,...o.sentRows.map(r=>[r.product,r.listName,r.costureira].join(' ')),...o.pendingItems.map(r=>[r.product,r.color,r.listName].join(' '))].join(' ').toLowerCase();
+       if(!hay.includes(search))return false;
+     }
+     if(onlySewing&&o.sent<=0)return false;
+     return true;
+   }).sort((a,b)=>String(a.pedido).localeCompare(String(b.pedido),undefined,{numeric:true}));
+ },[baseRows,pendingItems,search,onlySewing]);
+ const [expandedOrder,setExpandedOrder]=useState('');
+ const [materialsOpen,setMaterialsOpen]=useState(false);
  const filteredReports=useMemo(()=>reports.filter(r=>{
    const date=String(r.date||'');
    const start=filters.startDate||'0000-01-01',end=filters.endDate||'9999-12-31';
@@ -80,7 +127,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    if(filters.costureira&&r.costureira!==filters.costureira)return false;
    if(filters.listId&&r.listId!==filters.listId)return false;
    return true;
- }),[reports,filters]);
+ }),[reports,filters.startDate,filters.endDate,filters.costureira,filters.listId]);
  const materialTotals=useMemo(()=>{
    const items=[];
    for(const r of filteredReports)for(const item of (r.items||[])){
@@ -90,37 +137,107 @@ function PublicShare({data,loading,error,filters,setFilters}){
    const mats=calculateMaterials(items),map=new Map();
    for(const m of mats){
      const key=m.material+'|'+m.spec+'|'+m.unit+'|'+m.color;
-     const old=map.get(key);
-     if(old)old.qty+=m.qty; else map.set(key,{...m,key});
+     const old=map.get(key);if(old)old.qty+=m.qty;else map.set(key,{...m,key});
    }
-   return [...map.values()].sort((a,b)=>a.material.localeCompare(b.material)||a.spec.localeCompare(b.spec));
+   return [...map.values()].sort((a,b)=>a.material.localeCompare(b.material)||a.spec.localeCompare(b.spec)||a.color.localeCompare(b.color));
  },[filteredReports,filters.product]);
+ const statusFor=o=>o.pending>0?(o.sent>0?'PARCIAL':'PENDENTE'):'ENVIADO';
+ const setFilter=(patch)=>setFilters({...filters,...patch});
+ const resetFilters=()=>setFilters({startDate:'',endDate:'',costureira:share.share_type==='seamstress'?(share.costureira||''):'',product:'',listId:share.share_type==='list'?(share.list_id||''):'',search:'',onlySewing:false});
+ const scrollTo=id=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
+ const csvEscape=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const exportCsv=()=>{
+   const header=['DATA','PRODUTO','QUANTIDADE','COR','Nº PEDIDO','CLIENTE','ACOMPANHAMENTO','COSTUREIRA','LISTA','LANÇADO POR'];
+   const body=rows.map(r=>[r.date,r.product,r.qty,r.color,r.pedido,r.cliente,r.tracking,r.costureira,r.listName,r.createdBy?.name||r.createdBy?.email||'']);
+   const pendingHeader=['COR','PRODUTO','Nº PEDIDO','LISTA','PENDENTE'];
+   const pendingBody=filteredPending.map(p=>[p.color,p.product,p.pedido,p.listName,p.pending]);
+   const csv=[header,...body,[],pendingHeader,...pendingBody].map(row=>row.map(csvEscape).join(';')).join('\r\n');
+   const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8;'});
+   const url=URL.createObjectURL(blob),a=document.createElement('a');
+   a.href=url;a.download='WORKNEO-acompanhamento-'+today()+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };
+ const printPage=()=>window.print();
  if(loading&&!data)return <main className="page"><section className="panel"><div className="empty">Carregando acompanhamento...</div></section></main>;
- if(error&&!data)return <main className="page"><section className="panel"><div className="empty">{error}</div></section></main>;
+ if(error&&!data)return <main className="page"><section className="panel"><div className="empty"><h2>ERRO NO ACOMPANHAMENTO</h2><p>{error}</p><button className="primary" onClick={()=>window.location.reload()}>🔄 RECARREGAR</button></div></section></main>;
  const scopeLabel=share.share_type==='list'?'Lista específica':share.share_type==='seamstress'?'Costureira específica':'Produção geral';
- const resetFilters=()=>setFilters({startDate:'',endDate:'',costureira:share.share_type==='seamstress'?(share.costureira||''):'',product:'',listId:share.share_type==='list'?(share.list_id||''):''});
- return <main className="page">
- <section className="panel"><div className="section-head"><div><h2>🔗 ACOMPANHAMENTO DE PRODUÇÃO</h2><p>{scopeLabel} · atualização automática</p></div><div className="status" style={{color:'#1769e0'}}>● ONLINE</div></div>
- <div className="form-grid"><label>DATA INICIAL<input type="date" min={share.start_date||undefined} max={share.end_date||undefined} value={filters.startDate} onChange={e=>setFilters({...filters,startDate:e.target.value})}/></label><label>DATA FINAL<input type="date" min={share.start_date||undefined} max={share.end_date||undefined} value={filters.endDate} onChange={e=>setFilters({...filters,endDate:e.target.value})}/></label><label>COSTUREIRA<select disabled={share.share_type==='seamstress'} value={filters.costureira} onChange={e=>setFilters({...filters,costureira:e.target.value})}><option value="">Todas</option>{costureiras.map(x=><option key={x}>{x}</option>)}</select></label><label>PRODUTO<select value={filters.product} onChange={e=>setFilters({...filters,product:e.target.value})}><option value="">Todos</option>{products.map(x=><option key={x}>{x}</option>)}</select></label><label>LISTA<select disabled={share.share_type==='list'} value={filters.listId} onChange={e=>setFilters({...filters,listId:e.target.value})}><option value="">Todas</option>{lists.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label></div>
- <div className="actions"><button className="primary" onClick={resetFilters}>🔄 LIMPAR FILTROS</button></div></section>
- <section className="summary-grid" style={{marginBottom:18}}><div className="summary-card"><span>PEÇAS ENVIADAS</span><b>{fmt(total)}</b><small>nos filtros atuais</small></div><div className="summary-card"><span>PRODUTOS</span><b>{new Set(rows.map(r=>r.product)).size}</b><small>produtos encontrados</small></div><div className="summary-card"><span>RELATÓRIOS</span><b>{filteredReports.length}</b><small>envios registrados</small></div><div className="summary-card"><span>MATERIAIS</span><b>{fmt(materialTotals.length)}</b><small>tipos calculados</small></div></section>
+ return <main className="page tracking-page">
+   <section className="panel tracking-hero" id="inicio">
+     <div className="section-head"><div><div className="eyebrow">🔗 ACOMPANHAMENTO DE PRODUÇÃO</div><h2>{scopeLabel}</h2><p>Consulte pedidos, etapas de corte/costura e materiais em uma única tela.</p></div><div className="status status-online">● ONLINE</div></div>
+     <div className="tracking-actions">
+       <button className="secondary-action" onClick={()=>scrollTo('pedidos')}>📦 PEDIDOS</button>
+       <button className="secondary-action" onClick={()=>scrollTo('pendentes')}>⏳ PENDENTES</button>
+       <button className="secondary-action" onClick={()=>scrollTo('materiais')}>🧵 MATÉRIAS-PRIMAS</button>
+       <button className="secondary-action" onClick={exportCsv}>⬇ EXPORTAR CSV</button>
+       <button className="secondary-action" onClick={printPage}>🖨 IMPRIMIR</button>
+     </div>
+     <div className="tracking-search">
+       <label className="search-field"><span>🔎</span><input value={filters.search||''} onChange={e=>setFilter({search:e.target.value})} placeholder="Pesquisar pedido, cliente ou código de acompanhamento" aria-label="Pesquisar pedido, cliente ou código de acompanhamento"/>{filters.search&&<button type="button" className="clear-search" onClick={()=>setFilter({search:''})} aria-label="Limpar busca">×</button>}</label>
+       <label className="tracking-toggle"><input type="checkbox" checked={onlySewing} onChange={e=>setFilter({onlySewing:e.target.checked})}/><span>Mostrar apenas pedidos na Costura</span></label>
+     </div>
+     <div className="status-filters" role="group" aria-label="Filtro rápido de status">
+       <button className={!onlySewing&&!filters.showPending?'active':''} onClick={()=>setFilter({onlySewing:false,showPending:false})}>TODOS</button>
+       <button className={onlySewing?'active':''} onClick={()=>setFilter({onlySewing:true,showPending:false})}>NA COSTURA</button>
+       <button className={filters.showPending?'active':''} onClick={()=>setFilter({onlySewing:false,showPending:true})}>PENDENTES</button>
+     </div>
+     <div className="form-grid tracking-filters">
+       <label>DATA INICIAL<input type="date" min={share.start_date||undefined} max={share.end_date||undefined} value={filters.startDate||''} onChange={e=>setFilter({startDate:e.target.value})}/></label>
+       <label>DATA FINAL<input type="date" min={share.start_date||undefined} max={share.end_date||undefined} value={filters.endDate||''} onChange={e=>setFilter({endDate:e.target.value})}/></label>
+       <label>COSTUREIRA<select disabled={share.share_type==='seamstress'} value={filters.costureira||''} onChange={e=>setFilter({costureira:e.target.value})}><option value="">Todas</option>{costureiras.map(x=><option key={x}>{x}</option>)}</select></label>
+       <label>PRODUTO<select value={filters.product||''} onChange={e=>setFilter({product:e.target.value})}><option value="">Todos</option>{products.map(x=><option key={x}>{x}</option>)}</select></label>
+       <label>LISTA<select disabled={share.share_type==='list'} value={filters.listId||''} onChange={e=>setFilter({listId:e.target.value})}><option value="">Todas</option>{lists.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+     </div>
+     <div className="actions"><button className="primary" onClick={resetFilters}>🔄 LIMPAR FILTROS</button></div>
+   </section>
 
- <section className="panel"><div className="section-head"><div><h2>📦 ITENS ENVIADOS À COSTURA</h2><p>Detalhamento por data, produto, quantidade, cor, pedido e costureira.</p></div></div>{rows.length?<div className="table-wrap"><table><thead><tr><th>DATA</th><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>Nº PEDIDO</th><th>COSTUREIRA</th><th>LISTA</th><th>LANÇADO POR</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{r.color||'—'}</td><td>{r.pedido||'—'}</td><td>{r.costureira||'—'}</td><td>{r.listName||'—'}</td><td>{r.createdBy?.name||r.createdBy?.email||'—'}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhum item enviado com estes filtros.</div>}</section>
+   <section className="summary-grid tracking-summary">
+     <div className="summary-card"><span>PEÇAS ENVIADAS</span><b>{fmt(total)}</b><small>nos filtros atuais</small></div>
+     <div className="summary-card"><span>PENDENTES</span><b>{fmt(pendingTotal)}</b><small>aguardando costura</small></div>
+     <div className="summary-card"><span>PEDIDOS</span><b>{orders.length}</b><small>encontrados</small></div>
+     <div className="summary-card"><span>MATÉRIAS-PRIMAS</span><b>{fmt(materialTotals.length)}</b><small>tipos calculados</small></div>
+   </section>
 
- <section className="panel"><div className="section-head"><div><h2>📅 RESUMO POR PRODUTO E DIA DE ENVIO</h2><p>O dia é a data do envio do relatório à costureira.</p></div></div>{grouped.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>QUANTIDADE</th></tr></thead><tbody>{grouped.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada.</div>}</section>
+   <section className="panel" id="pedidos">
+     <div className="section-head"><div><div className="eyebrow">📦 CONTROLE POR PEDIDO</div><h2>Pedidos / Produção</h2><p>Clique em um pedido para expandir todos os detalhes.</p></div></div>
+     {orders.length?<div className="order-list">{orders.map(order=>{
+       const status=statusFor(order),open=expandedOrder===order.pedido;
+       return <article className={'order-card '+(open?'expanded':'')} key={order.pedido}>
+         <button className="order-header" onClick={()=>setExpandedOrder(open?'':order.pedido)} aria-expanded={open}>
+           <div className="order-main"><strong>{order.pedido==='SEM PEDIDO'?'Pedido sem número':'Pedido '+order.pedido}</strong>{order.cliente&&<span>{order.cliente}</span>}{order.tracking&&<small>🔗 {order.tracking}</small>}</div>
+           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase()}>{status==='ENVIADO'?'✓ Enviado para Costura':status==='PARCIAL'?'↗ Envio Parcial':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sent+order.pending)} peças</b><span className="chevron">{open?'▲':'▼'}</span></div>
+         </button>
+         {open&&<div className="order-details">
+           <div className="detail-grid"><div><span>ENVIADO À COSTURA</span><b>{fmt(order.sent)}</b></div><div><span>PENDENTE</span><b>{fmt(order.pending)}</b></div><div><span>CORES</span><b>{[...order.colors].join(', ')||'—'}</b></div></div>
+           {order.sentRows.length>0&&<div className="detail-block"><h3>✓ Enviado para Costura</h3><div className="table-wrap compact"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>COSTUREIRA</th><th>DATA</th></tr></thead><tbody>{order.sentRows.map((r,i)=><tr key={i}><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{r.color||'—'}</td><td>{r.costureira||'—'}</td><td>{fmtDate(r.date)}</td></tr>)}</tbody></table></div></div>}
+           {order.pendingItems.length>0&&<div className="detail-block"><h3>⏳ Ainda pendente</h3><div className="pending-mini">{order.pendingItems.map((p,i)=><div className="pending-line" key={p.key+'-'+i}><span className="color-dot">{p.color}</span><b>{p.product}</b><span>{fmt(p.pending)} peças</span>{p.listName&&<small>{p.listName}</small>}</div>)}</div></div>}
+         </div>}
+       </article>
+     })}</div>:<div className="empty">Nenhum pedido encontrado com os filtros atuais.</div>}
+   </section>
 
- <section className="panel"><div className="section-head"><div><h2>⏳ ITENS PENDENTES DE ENVIO</h2><p>Quantidade original das listas menos o que já foi enviado. Agrupado por produto.</p></div></div>{pendingProducts.length?<div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>LISTA(S)</th><th>ORIGINAL</th><th>ENVIADO</th><th>PENDENTE</th></tr></thead><tbody>{pendingProducts.map(x=><tr key={x.product}><td>{x.product}</td><td>{lists.filter(l=>(!filters.listId||l.id===filters.listId)&&(l.items||[]).some(i=>i.product===x.product)).map(l=>l.name).join(' · ')||'—'}</td><td>{fmt(x.original)}</td><td>{fmt(x.sent)}</td><td><b style={{color:'#d97706'}}>{fmt(x.pending)}</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhum item pendente dentro dos filtros atuais.</div>}</section>
+   <section className="panel" id="pendentes">
+     <div className="section-head"><div><div className="eyebrow">⏳ ETAPA ANTERIOR À COSTURA</div><h2>Itens / Pedidos Pendentes de Envio</h2><p>Todos os itens abaixo estão agrupados estritamente por COR.</p></div></div>
+     {filteredPending.length?<div className="color-groups">{[...new Set(filteredPending.map(x=>x.color))].sort((a,b)=>norm(a).localeCompare(norm(b))).map(color=>{
+       const group=filteredPending.filter(x=>x.color===color),qty=group.reduce((s,x)=>s+x.pending,0);
+       return <article className="color-group" key={color}><div className="color-group-head"><div><span className="color-label">{color}</span><strong>{fmt(qty)} peças pendentes</strong></div><span className="badge badge-pending">{group.length} itens</span></div><div className="color-items">{group.map(p=><button className="color-item" key={p.key} onClick={()=>setExpandedOrder(p.pedido)}><span><b>{p.product}</b><small>{p.pedido==='SEM PEDIDO'?'Sem nº de pedido':'Pedido '+p.pedido} · {p.listName}</small></span><strong>{fmt(p.pending)}</strong></button>)}</div></article>
+     })}</div>:<div className="empty">Nenhum item pendente de envio nos filtros atuais.</div>}
+   </section>
 
- <section className="panel"><div className="section-head"><div><h2>📋 LISTAS AINDA NÃO ENVIADAS</h2><p>Lista completa e saldo de peças que ainda aguardam envio.</p></div></div>{pendingLists.length?<div className="table-wrap"><table><thead><tr><th>LISTA</th><th>PEÇAS PENDENTES</th><th>STATUS</th></tr></thead><tbody>{pendingLists.map(l=><tr key={l.id}><td>{l.name}</td><td>{fmt(l.pending)}</td><td><b style={{color:'#d97706'}}>{l.sentQty>0?'ENVIO PARCIAL':'AGUARDANDO ENVIO'}</b></td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma lista pendente de envio.</div>}</section>
+   <section className="panel" id="materiais">
+     <button className="collapsible-header" onClick={()=>setMaterialsOpen(v=>!v)} aria-expanded={materialsOpen}><span>🧵 Matérias-Primas <b>({materialTotals.length} itens)</b></span><span>{materialsOpen?'▲':'▼'}</span></button>
+     {!materialsOpen?<div className="collapsed-summary">Lista minimizada para manter o acompanhamento limpo. Toque para visualizar zíperes, aviamentos, tecidos, linhas e demais insumos.</div>:<div className="collapsible-content">{materialTotals.length?<div className="table-wrap"><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>{materialTotals.map(m=><tr key={m.key}><td><b>{m.material}</b></td><td>{m.spec||'—'}</td><td>{m.color||'SEM COR'}</td><td>{fmt(m.qty)} {m.unit}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhum material calculado para os filtros atuais.</div>}</div>}
+   </section>
 
- <section className="panel"><div className="section-head"><div><h2>🧵 MATERIAIS ENVIADOS PARA A COSTURA</h2><p>Quantidades calculadas pela ficha técnica dos produtos enviados no período e filtros selecionados.</p></div></div>{materialTotals.length?<div className="table-wrap"><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>COR</th><th>TOTAL</th></tr></thead><tbody>{materialTotals.map(m=><tr key={m.key}><td><b>{m.material}</b></td><td>{m.spec||'—'}</td><td>{m.color||'SEM COR'}</td><td>{fmt(m.qty)} {m.unit}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhum material calculado para os filtros atuais.</div>}</section>
+   <section className="panel" id="resumo">
+     <div className="section-head"><div><div className="eyebrow">📊 RESUMO</div><h2>Resumo por produto e dia de envio</h2><p>O dia é a data do envio do relatório à costureira.</p></div></div>
+     {baseRows.length?<div className="table-wrap"><table><thead><tr><th>DATA DE ENVIO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>COR</th><th>PEDIDO</th><th>COSTUREIRA</th></tr></thead><tbody>{baseRows.map((r,i)=><tr key={i}><td>{fmtDate(r.date)}</td><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{r.color||'—'}</td><td>{r.pedido||'—'}</td><td>{r.costureira||'—'}</td></tr>)}</tbody></table></div>:<div className="empty">Nenhuma produção encontrada.</div>}
+   </section>
 
- <section className="panel"><div className="section-head"><div><h2>📄 RELATÓRIOS FEITOS</h2><p>Cada envio fica disponível para consulta, com produtos e materiais calculados.</p></div></div>{filteredReports.length?<div className="saved-list">{filteredReports.map(r=>{const q=(r.items||[]).reduce((s,x)=>s+n(x.qty),0);const rm=calculateMaterials(r.items||[]);return <article className="saved" key={r.id}><div><b>{r.costureira}</b><span>{r.listName} · {fmtDate(r.date)}</span><span>{fmt(q)} peças · {r.items?.length||0} itens</span></div><details><summary>👁 Visualizar relatório</summary><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>PEDIDO</th></tr></thead><tbody>{(r.items||[]).map((x,i)=><tr key={i}><td>{x.product}</td><td>{fmt(x.qty)}</td><td>{x.color||'—'}</td><td>{x.pedido||'—'}</td><td>{x.createdBy?.name||x.createdBy?.email||'—'}</td></tr>)}</tbody></table></div><h3 style={{marginTop:16}}>Materiais deste relatório</h3><div className="table-wrap"><table><thead><tr><th>MATERIAL</th><th>ESPECIFICAÇÃO</th><th>TOTAL</th></tr></thead><tbody>{rm.map(m=><tr key={m.key}><td>{m.material}</td><td>{m.spec||'—'}</td><td>{fmt(m.qty)} {m.unit}</td></tr>)}</tbody></table></div></details></article>})}</div>:<div className="empty">Nenhum relatório encontrado.</div>}</section>
-
- <section className="panel"><div className="section-head"><div><h2>📊 RESUMO POR COSTUREIRA</h2><p>Peças enviadas nos filtros atuais.</p></div></div><div className="summary-grid">{costureiras.map(c=>{const q=rows.filter(r=>r.costureira===c).reduce((s,r)=>s+r.qty,0);return <div className="summary-card" key={c}><span>{c}</span><b>{fmt(q)}</b><small>peças</small></div>})}</div></section>
- </main>
+   <section className="panel" id="relatorios">
+     <div className="section-head"><div><div className="eyebrow">📄 HISTÓRICO</div><h2>Relatórios feitos</h2><p>Cada envio fica disponível para consulta.</p></div></div>
+     {filteredReports.length?<div className="saved-list">{filteredReports.map(r=>{const q=(r.items||[]).reduce((s,x)=>s+n(x.qty),0);return <article className="saved" key={r.id}><button className="report-toggle" onClick={()=>setExpandedOrder(expandedOrder===('report-'+r.id)?'':'report-'+r.id)}><span><b>{r.costureira}</b><small>{r.listName} · {fmtDate(r.date)} · {fmt(q)} peças</small></span><span>{expandedOrder===('report-'+r.id)?'▲':'▼'}</span></button>{expandedOrder===('report-'+r.id)&&<div className="report-expanded"><div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>QTD.</th><th>COR</th><th>PEDIDO</th><th>LANÇADO POR</th></tr></thead><tbody>{(r.items||[]).map((x,i)=><tr key={i}><td>{x.product}</td><td>{fmt(x.qty)}</td><td>{x.color||'—'}</td><td>{x.pedido||'—'}</td><td>{x.createdBy?.name||x.createdBy?.email||'—'}</td></tr>)}</tbody></table></div></div>}</article>})}</div>:<div className="empty">Nenhum relatório encontrado.</div>}
+   </section>
+ </main>;
 }
-
 function App(){
 const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>read(LISTS_KEY)),[reports,setReports]=useState(()=>read(REPORTS_KEY));
 const[session,setSession]=useState(null),[workspace,setWorkspace]=useState(null),[teamMembers,setTeamMembers]=useState([]),[teamEmail,setTeamEmail]=useState(''),[teamName,setTeamName]=useState(''),[authLoading,setAuthLoading]=useState(isSupabaseConfigured),[authMode,setAuthMode]=useState('login'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authBusy,setAuthBusy]=useState(false),[syncStatus,setSyncStatus]=useState(isSupabaseConfigured?'aguardando login':'local');
