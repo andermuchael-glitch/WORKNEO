@@ -105,10 +105,23 @@ begin
     'id',r->>'id','listId',r->>'listId','listName',r->>'listName',
     'date',r->>'date','costureira',r->>'costureira','createdBy',coalesce(r->'createdBy','{}'::jsonb),
     'items',(select coalesce(jsonb_agg(jsonb_build_object(
-      'product',i->>'product','qty',coalesce((i->>'qty')::numeric,0),'returnedQty',coalesce((i->>'returnedQty')::numeric,0),'color',i->>'color','pedido',i->>'pedido',
+      'product',i->>'product','qty',coalesce((i->>'qty')::numeric,0),'returnedQty',coalesce((i->>'returnedQty')::numeric,0),
+      'sewingQty',greatest(0,coalesce((i->>'qty')::numeric,0)-coalesce((i->>'returnedQty')::numeric,0)),
+      'color',i->>'color','pedido',i->>'pedido',
       'cliente',coalesce(i->>'cliente',''),'tracking',coalesce(i->>'tracking',i->>'codigoAcompanhamento',''),
       'createdBy',coalesce(i->'createdBy','{}'::jsonb)
-    )),'[]'::jsonb) from jsonb_array_elements(coalesce(r->'items','[]'::jsonb)) i)
+    )),'[]'::jsonb) from jsonb_array_elements(coalesce(r->'items','[]'::jsonb)) i),
+    'returns',(select coalesce(jsonb_agg(jsonb_build_object(
+      'id',ret->>'id','date',ret->>'date','archived',coalesce((ret->>'archived')::boolean,false),
+      'archivedAt',ret->>'archivedAt','archivedBy',coalesce(ret->'archivedBy','{}'::jsonb),
+      'createdBy',coalesce(ret->'createdBy',r->'createdBy','{}'::jsonb),
+      'items',(select coalesce(jsonb_agg(jsonb_build_object(
+        'itemId',ri->>'itemId','product',ri->>'product','qty',coalesce((ri->>'qty')::numeric,0),
+        'color',ri->>'color','pedido',ri->>'pedido',
+        'cliente',coalesce(ri->>'cliente',''),'tracking',coalesce(ri->>'tracking',ri->>'codigoAcompanhamento','')
+      )),'[]'::jsonb) from jsonb_array_elements(coalesce(ret->'items','[]'::jsonb)) ri)
+    ) order by coalesce(ret->>'date','') desc),'[]'::jsonb)
+    from jsonb_array_elements(coalesce(r->'returns','[]'::jsonb)) ret)
   )),'[]'::jsonb)
   into v_reports
   from jsonb_array_elements(coalesce(d.reports,'[]'::jsonb)) r
