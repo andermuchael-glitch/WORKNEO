@@ -504,17 +504,6 @@ const restoreSeparationReturn=(reportId,returnId)=>{
  saveReports(reports.map(r=>r.id!==reportId?r:{...r,returns:(r.returns||[]).map(ret=>ret.id!==returnId?ret:{...ret,archived:false,archivedAt:null,archivedBy:null}),updatedAt:now}));
  setMessage('Retorno devolvido para a fila de SEPARAÇÃO.');
 };
-const archiveAllSeparation=()=>{
- if(!separationEntries.length){setMessage('Não há retornos pendentes de conferência.');return}
- const a=actor(),now=new Date().toISOString();
- const ids=new Set(separationEntries.map(x=>x.reportId+'|'+x.returnId));
- saveReports(reports.map(r=>{
-   const has=[...(r.returns||[])].some(ret=>ids.has(r.id+'|'+ret.id));
-   if(!has)return r;
-   return {...r,returns:(r.returns||[]).map(ret=>ids.has(r.id+'|'+ret.id)?{...ret,archived:true,archivedAt:now,archivedBy:a}:ret),updatedAt:now};
- }));
- setMessage(fmt(separationEntries.reduce((s,x)=>s+x.qty,0))+' peça(s) retornada(s) arquivada(s) após conferência.');
-};
 
 const totalReport=reportList?reportList.items.reduce((s,x)=>s+Math.min(n(sendQty[x.id]),Math.max(0,n(x.separacaoQty??x.qty))),0):0;
 const totals=useMemo(()=>{const m={};for(const r of reports)m[r.costureira]=(m[r.costureira]||0)+r.items.reduce((s,x)=>s+n(x.qty),0);return m},[reports]);
@@ -547,7 +536,6 @@ return <div className="app"><header className="top"><div><div className="brand">
  <div className="separation-toolbar">
   <div className="separation-stat"><span>RETORNOS PENDENTES</span><b>{separationEntries.length}</b></div>
   <div className="separation-stat"><span>PEÇAS</span><b>{fmt(separationEntries.reduce((s,x)=>s+x.qty,0))}</b></div>
-  <button className="primary" disabled={!separationEntries.length} onClick={archiveAllSeparation}>✓ ARQUIVAR CONFERIDOS</button>
   <button className="secondary-action" onClick={()=>setShowArchivedSeparation(v=>!v)}>{showArchivedSeparation?'OCULTAR ARQUIVADOS':'VER ARQUIVADOS ('+archivedSeparationEntries.length+')'}</button>
  </div>
  {separationEntries.length===0?<div className="empty"><h3>SEPARAÇÃO LIVRE</h3><p>Nenhum retorno aguardando conferência.</p>{archivedSeparationEntries.length>0&&!showArchivedSeparation&&<button className="secondary-action" onClick={()=>setShowArchivedSeparation(true)}>VER HISTÓRICO ARQUIVADO</button>}</div>:<div className="table-wrap separation-table"><table><thead><tr><th>DATA</th><th>PRODUTO</th><th>COR</th><th>PEDIDO</th><th>QTD. RETORNO</th><th>COSTUREIRA</th><th>LISTA</th><th>SEPARAÇÃO ATUAL</th><th>CONFERÊNCIA</th></tr></thead><tbody>{separationEntries.map(x=><tr key={x.key}><td>{fmtDate(x.date)}</td><td><b>{x.product}</b></td><td>{x.color}</td><td>{x.pedido}</td><td><strong>{fmt(x.qty)}</strong></td><td>{x.costureira}</td><td>{x.listName}</td><td><b>{fmt(x.separationBalance)}</b></td><td><button className="primary small-action" onClick={()=>archiveSeparationReturn(x.reportId,x.returnId)}>✓ CONFERIDO · ARQUIVAR</button></td></tr>)}</tbody></table></div>}
