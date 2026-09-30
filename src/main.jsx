@@ -13,6 +13,13 @@ const PRODUCTS=["PORTA GARRAFA LITRÃO","PORTA GARRAFA 600","PORTA GARRAFA 600 S
 const COLORS=["PRETO","ROYAL","MARINHO","VERMELHO","PINK","ROSA BEBÊ","VERDE","AMARELO","LILÁS","VERDE PALMEIRAS","BRANCO","CELESTE","LARANJA","VERDE ÁGUA","MARROM","CREME","BEGE","AZUL BEBÊ","CINZA"];
 const SEAMSTRESSES=["ELENI","MARA","SANDRA","MIRIAN","MARINA","ADRIANA","DONA JOSI","JAMINA","COSTURA INTERNA"];
 const LISTS_KEY='workneo-clean-lists-v1',REPORTS_KEY='workneo-clean-sewing-reports-v1';
+const isEmptyList=l=>!Array.isArray(l?.items)||l.items.length===0;
+const removeEmptyListsOnLoad=raw=>{
+  const source=Array.isArray(raw)?raw:[];
+  const cleaned=source.filter(l=>!isEmptyList(l));
+  return {cleaned,removed:source.length-cleaned.length};
+};
+
 const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
 const read=(k,f=[])=>{try{const v=JSON.parse(localStorage.getItem(k)||'null');return Array.isArray(v)?v:f}catch{return f}};
 const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
@@ -287,12 +294,6 @@ const[selectedListId,setSelectedListId]=useState(''),[listName,setListName]=useS
 const[reportListId,setReportListId]=useState(''),[costureira,setCostureira]=useState(''),[reportDate,setReportDate]=useState(today()),[sendQty,setSendQty]=useState({}),[message,setMessage]=useState('');
 const currentList=lists.find(x=>x.id===selectedListId)||null,reportList=lists.find(x=>x.id===reportListId)||null;
 const saveLists=v=>{setLists(v);write(LISTS_KEY,v)},saveReports=v=>{setReports(v);write(REPORTS_KEY,v)};
-const isEmptyList=l=>!Array.isArray(l?.items)||l.items.length===0;
-const removeEmptyListsOnLoad=raw=>{
-  const source=Array.isArray(raw)?raw:[];
-  const cleaned=source.filter(l=>!isEmptyList(l));
-  return {cleaned,removed:source.length-cleaned.length};
-};
 const[projectSearch,setProjectSearch]=useState('');
 const projectQuery=norm(projectSearch);
 const filteredLists=useMemo(()=>lists.filter(l=>{if(!projectQuery)return true;const hay=[l.name,...(l.items||[]).flatMap(x=>[x.product,x.color,x.pedido,x.cliente,x.customer,x.tracking,x.codigoAcompanhamento,x.createdBy?.name,x.createdBy?.email])].join(' ');return norm(hay).includes(projectQuery)}),[lists,projectQuery]);
