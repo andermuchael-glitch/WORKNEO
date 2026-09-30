@@ -356,15 +356,25 @@ useEffect(()=>{
   let alive=true;
   cloudReadyRef.current=false;
   setSyncStatus('sincronizando');
-  loadWorkspaceData(workspace.workspace_id).then(data=>{
+  loadWorkspaceData(workspace.workspace_id).then(async data=>{
     if(!alive)return;
     skipNextSyncRef.current=true;
     lastCloudUpdateRef.current=data?.updated_at||'';
     const cloudLists=Array.isArray(data?.lists)?data.lists:[];
     const cloudReports=Array.isArray(data?.reports)?data.reports:[];
-    const cleanedLists=removeEmptyListsOnLoad(cloudLists).cleaned;
+    const cleanedResult=removeEmptyListsOnLoad(cloudLists);
+    const cleanedLists=cleanedResult.cleaned;
     setLists(cleanedLists);write(LISTS_KEY,cleanedLists);
     setReports(cloudReports);write(REPORTS_KEY,cloudReports);
+    if(workspace?.role==='admin'&&cleanedResult.removed>0){
+      try{
+        await saveWorkspaceData(workspace.workspace_id,cleanedLists,cloudReports);
+        setMessage(cleanedResult.removed+' lista(s) vazia(s) removida(s).');
+      }catch(error){
+        console.error(error);
+        setMessage('As listas vazias foram ocultadas, mas não foi possível removê-las do servidor.');
+      }
+    }
     setSyncStatus('sincronizado');
     cloudReadyRef.current=true;
   }).catch(error=>{
