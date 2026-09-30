@@ -276,7 +276,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
 }
 function App(){
 const[blackTheme,toggleBlackTheme]=useBlackTheme();
-const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>read(LISTS_KEY)),[reports,setReports]=useState(()=>read(REPORTS_KEY)),[sendControlOpen,setSendControlOpen]=useState(false),[returnControlOpen,setReturnControlOpen]=useState(false),[returnQty,setReturnQty]=useState({}),[expandedSeamstress,setExpandedSeamstress]=useState(''),[expandedSeamstressMetric,setExpandedSeamstressMetric]=useState('sent'),[showArchivedSeparation,setShowArchivedSeparation]=useState(false);
+const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>removeEmptyListsOnLoad(read(LISTS_KEY)).cleaned),[reports,setReports]=useState(()=>read(REPORTS_KEY)),[sendControlOpen,setSendControlOpen]=useState(false),[returnControlOpen,setReturnControlOpen]=useState(false),[returnQty,setReturnQty]=useState({}),[expandedSeamstress,setExpandedSeamstress]=useState(''),[expandedSeamstressMetric,setExpandedSeamstressMetric]=useState('sent'),[showArchivedSeparation,setShowArchivedSeparation]=useState(false);
 const[session,setSession]=useState(null),[workspace,setWorkspace]=useState(null),[teamMembers,setTeamMembers]=useState([]),[teamEmail,setTeamEmail]=useState(''),[teamName,setTeamName]=useState(''),[authLoading,setAuthLoading]=useState(isSupabaseConfigured),[authMode,setAuthMode]=useState('login'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authBusy,setAuthBusy]=useState(false),[syncStatus,setSyncStatus]=useState(isSupabaseConfigured?'aguardando login':'local');
 const shareToken=useMemo(()=>new URLSearchParams(window.location.search).get('acompanhamento')||'',[]);
 const[publicShare,setPublicShare]=useState(null),[publicShareLoading,setPublicShareLoading]=useState(Boolean(shareToken)),[publicShareError,setPublicShareError]=useState('');
@@ -287,6 +287,12 @@ const[selectedListId,setSelectedListId]=useState(''),[listName,setListName]=useS
 const[reportListId,setReportListId]=useState(''),[costureira,setCostureira]=useState(''),[reportDate,setReportDate]=useState(today()),[sendQty,setSendQty]=useState({}),[message,setMessage]=useState('');
 const currentList=lists.find(x=>x.id===selectedListId)||null,reportList=lists.find(x=>x.id===reportListId)||null;
 const saveLists=v=>{setLists(v);write(LISTS_KEY,v)},saveReports=v=>{setReports(v);write(REPORTS_KEY,v)};
+const isEmptyList=l=>!Array.isArray(l?.items)||l.items.length===0;
+const removeEmptyListsOnLoad=raw=>{
+  const source=Array.isArray(raw)?raw:[];
+  const cleaned=source.filter(l=>!isEmptyList(l));
+  return {cleaned,removed:source.length-cleaned.length};
+};
 const[projectSearch,setProjectSearch]=useState('');
 const projectQuery=norm(projectSearch);
 const filteredLists=useMemo(()=>lists.filter(l=>{if(!projectQuery)return true;const hay=[l.name,...(l.items||[]).flatMap(x=>[x.product,x.color,x.pedido,x.cliente,x.customer,x.tracking,x.codigoAcompanhamento,x.createdBy?.name,x.createdBy?.email])].join(' ');return norm(hay).includes(projectQuery)}),[lists,projectQuery]);
@@ -356,7 +362,8 @@ useEffect(()=>{
     lastCloudUpdateRef.current=data?.updated_at||'';
     const cloudLists=Array.isArray(data?.lists)?data.lists:[];
     const cloudReports=Array.isArray(data?.reports)?data.reports:[];
-    setLists(cloudLists);write(LISTS_KEY,cloudLists);
+    const cleanedLists=removeEmptyListsOnLoad(cloudLists).cleaned;
+    setLists(cleanedLists);write(LISTS_KEY,cleanedLists);
     setReports(cloudReports);write(REPORTS_KEY,cloudReports);
     setSyncStatus('sincronizado');
     cloudReadyRef.current=true;
@@ -402,7 +409,8 @@ useEffect(()=>{
     lastCloudUpdateRef.current=payload.updated_at||'';
     const cloudLists=Array.isArray(payload.lists)?payload.lists:[];
     const cloudReports=Array.isArray(payload.reports)?payload.reports:[];
-    setLists(cloudLists);write(LISTS_KEY,cloudLists);
+    const cleanedLists=removeEmptyListsOnLoad(cloudLists).cleaned;
+    setLists(cleanedLists);write(LISTS_KEY,cleanedLists);
     setReports(cloudReports);write(REPORTS_KEY,cloudReports);
     setSyncStatus('sincronizado');
   },status=>{
