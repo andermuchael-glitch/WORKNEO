@@ -171,6 +171,25 @@ function PublicShare({data,loading,error,filters,setFilters}){
    }
    return [...map.values()].sort((a,b)=>a.material.localeCompare(b.material)||a.spec.localeCompare(b.spec)||a.color.localeCompare(b.color));
  },[filteredReports,filters.product]);
+ const productProductionSummary=useMemo(()=>{
+   const start=filters.startDate||'0000-01-01',end=filters.endDate||'9999-12-31';
+   const daily=new Map(),period=new Map();
+   for(const report of reports){
+     const date=String(report.date||'');
+     if(date<start||date>end)continue;
+     if(filters.costureira&&report.costureira!==filters.costureira)continue;
+     if(filters.listId&&report.listId!==filters.listId)continue;
+     for(const item of (report.items||[])){
+       if(filters.product&&item.product!==filters.product)continue;
+       const product=String(item.product||'—'),qty=n(item.qty);
+       const key=[date,report.listId||'',report.listName||'—',product].join('|');
+       const row=daily.get(key)||{key,date,listName:report.listName||'—',product,qty:0};
+       row.qty+=qty;daily.set(key,row);
+       period.set(product,(period.get(product)||0)+qty);
+     }
+   }
+   return {daily:[...daily.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.listName.localeCompare(b.listName)||a.product.localeCompare(b.product)),period:[...period.entries()].map(([product,qty])=>({product,qty})).sort((a,b)=>a.product.localeCompare(b.product)),total:[...period.values()].reduce((sum,qty)=>sum+qty,0)};
+ },[reports,filters.startDate,filters.endDate,filters.costureira,filters.listId,filters.product]);
  const statusFor=o=>o.sewing>0?(o.pending>0?'PARCIAL':'NA COSTURA'):(o.pending>0?'PENDENTE':'RETORNADO');
  const setFilter=(patch)=>setFilters({...filters,...patch});
  const resetFilters=()=>setFilters({startDate:'',endDate:'',costureira:share.share_type==='seamstress'?(share.costureira||''):'',product:'',listId:share.share_type==='list'?(share.list_id||''):'',search:'',onlySewing:false});
@@ -227,6 +246,14 @@ function PublicShare({data,loading,error,filters,setFilters}){
      <div className="summary-card"><span>PENDENTES</span><b>{fmt(pendingTotal)}</b><small>aguardando costura</small></div>
      <div className="summary-card"><span>PEDIDOS</span><b>{orders.length}</b><small>encontrados</small></div>
      <div className="summary-card"><span>MATÉRIAS-PRIMAS</span><b>{fmt(materialTotals.length)}</b><small>tipos calculados</small></div>
+   </section>
+
+   <section className="panel" id="producao-produto">
+     <div className="section-head"><div><div className="eyebrow">📊 PRODUÇÃO POR PRODUTO</div><h2>Quantidade enviada por período</h2><p>Contagem total por produto, sem separar por cor, agrupada por data e lista enviada para costura.</p></div><strong>TOTAL DO PERÍODO: {fmt(productProductionSummary.total)} peças</strong></div>
+     <h3>Resumo por produto no período</h3>
+     {productProductionSummary.period.length?<div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>TOTAL NO PERÍODO</th></tr></thead><tbody>{productProductionSummary.period.map(row=><tr key={row.product}><td>{row.product}</td><td>{fmt(row.qty)}</td></tr>)}</tbody></table></div>:<p>Nenhum envio encontrado no período selecionado.</p>}
+     <h3>Detalhamento por dia e lista enviada</h3>
+     {productProductionSummary.daily.length?<div className="table-wrap"><table><thead><tr><th>DATA DO ENVIO</th><th>LISTA</th><th>PRODUTO</th><th>QUANTIDADE TOTAL (TODAS AS CORES)</th></tr></thead><tbody>{productProductionSummary.daily.map(row=><tr key={row.key}><td>{fmtDate(row.date)}</td><td>{row.listName}</td><td>{row.product}</td><td>{fmt(row.qty)}</td></tr>)}</tbody></table></div>:<p>Nenhum envio encontrado no período selecionado.</p>}
    </section>
 
    <section className="panel" id="pedidos">
