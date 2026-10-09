@@ -173,7 +173,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
  },[filteredReports,filters.product]);
  const productProductionSummary=useMemo(()=>{
    const start=filters.startDate||'0000-01-01',end=filters.endDate||'9999-12-31';
-   const daily=new Map(),period=new Map();
+   const cells=new Map(),period=new Map(),dates=new Set();
    for(const report of reports){
      const date=String(report.date||'');
      if(date<start||date>end)continue;
@@ -181,14 +181,15 @@ function PublicShare({data,loading,error,filters,setFilters}){
      if(filters.listId&&report.listId!==filters.listId)continue;
      for(const item of (report.items||[])){
        if(filters.product&&item.product!==filters.product)continue;
-       const product=String(item.product||'—'),qty=n(item.qty);
-       const key=[date,report.listId||'',report.listName||'—',product].join('|');
-       const row=daily.get(key)||{key,date,listName:report.listName||'—',product,qty:0};
-       row.qty+=qty;daily.set(key,row);
+       const product=String(item.product||'—'),qty=n(item.qty),key=date+'|'+product;
+       cells.set(key,(cells.get(key)||0)+qty);
        period.set(product,(period.get(product)||0)+qty);
+       dates.add(date);
      }
    }
-   return {daily:[...daily.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.listName.localeCompare(b.listName)||a.product.localeCompare(b.product)),period:[...period.entries()].map(([product,qty])=>({product,qty})).sort((a,b)=>a.product.localeCompare(b.product)),total:[...period.values()].reduce((sum,qty)=>sum+qty,0)};
+   const products=[...period.keys()].sort((a,b)=>a.localeCompare(b));
+   const daily=[...dates].sort((a,b)=>b.localeCompare(a)).map(date=>({date,values:products.map(product=>({product,qty:cells.get(date+'|'+product)||0})),total:products.reduce((sum,product)=>sum+(cells.get(date+'|'+product)||0),0)}));
+   return {daily,products,period:products.map(product=>({product,qty:period.get(product)||0})),total:[...period.values()].reduce((sum,qty)=>sum+qty,0)};
  },[reports,filters.startDate,filters.endDate,filters.costureira,filters.listId,filters.product]);
  const statusFor=o=>o.sewing>0?(o.pending>0?'PARCIAL':'NA COSTURA'):(o.pending>0?'PENDENTE':'RETORNADO');
  const setFilter=(patch)=>setFilters({...filters,...patch});
@@ -249,11 +250,8 @@ function PublicShare({data,loading,error,filters,setFilters}){
    </section>
 
    <section className="panel" id="producao-produto">
-     <div className="section-head"><div><div className="eyebrow">📊 PRODUÇÃO POR PRODUTO</div><h2>Quantidade enviada por período</h2><p>Contagem total por produto, sem separar por cor, agrupada por data e lista enviada para costura.</p></div><strong>TOTAL DO PERÍODO: {fmt(productProductionSummary.total)} peças</strong></div>
-     <h3>Resumo por produto no período</h3>
-     {productProductionSummary.period.length?<div className="table-wrap"><table><thead><tr><th>PRODUTO</th><th>TOTAL NO PERÍODO</th></tr></thead><tbody>{productProductionSummary.period.map(row=><tr key={row.product}><td>{row.product}</td><td>{fmt(row.qty)}</td></tr>)}</tbody></table></div>:<p>Nenhum envio encontrado no período selecionado.</p>}
-     <h3>Detalhamento por dia e lista enviada</h3>
-     {productProductionSummary.daily.length?<div className="table-wrap"><table><thead><tr><th>DATA DO ENVIO</th><th>LISTA</th><th>PRODUTO</th><th>QUANTIDADE TOTAL (TODAS AS CORES)</th></tr></thead><tbody>{productProductionSummary.daily.map(row=><tr key={row.key}><td>{fmtDate(row.date)}</td><td>{row.listName}</td><td>{row.product}</td><td>{fmt(row.qty)}</td></tr>)}</tbody></table></div>:<p>Nenhum envio encontrado no período selecionado.</p>}
+     <div className="section-head"><div><div className="eyebrow">📊 PRODUÇÃO POR PRODUTO</div><h2>Quantidade enviada por período</h2><p>Datas nas linhas e produtos nas colunas. Quantidades somadas entre todas as cores e listas enviadas no mesmo dia.</p></div><strong>TOTAL DO PERÍODO: {fmt(productProductionSummary.total)} peças</strong></div>
+     {productProductionSummary.daily.length?<div className="table-wrap" style={{overflowX:'auto'}}><table><thead><tr><th>DATA ENVIADA ↓</th>{productProductionSummary.products.map(product=><th key={product} style={{minWidth:130}}>{product}</th>)}<th>TOTAL DO DIA</th></tr></thead><tbody>{productProductionSummary.daily.map(row=><tr key={row.date}><th scope="row">{fmtDate(row.date)}</th>{row.values.map(cell=><td key={cell.product} style={{textAlign:'center'}}>{cell.qty?fmt(cell.qty):'—'}</td>)}<td style={{textAlign:'center',fontWeight:800}}>{fmt(row.total)}</td></tr>)}</tbody><tfoot><tr><th>TOTAL POR PRODUTO</th>{productProductionSummary.period.map(row=><th key={row.product}>{fmt(row.qty)}</th>)}<th>{fmt(productProductionSummary.total)}</th></tr></tfoot></table></div>:<p>Nenhum envio encontrado no período selecionado.</p>}
    </section>
 
    <section className="panel" id="pedidos">
