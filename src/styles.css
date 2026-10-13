@@ -312,3 +312,28 @@ body.theme-black .top{background:linear-gradient(110deg,#101827,#17243a)!importa
 .theme-black .production-matrix tfoot .product-sticky{background:#155741!important;color:#c4f7df!important}
 .theme-black .production-matrix tfoot .grand-total-cell{background:linear-gradient(135deg,#087f5b,#10a878)!important;color:#fff!important}
 @media(max-width:600px){.theme-black .main-lists-premium .panel{padding:16px}}
+
+
+/* Alternância de visualização da lista */
+.list-view-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:22px 0 12px;padding:12px 14px;border:1px solid #dbe6f7;border-radius:14px;background:linear-gradient(120deg,#f5f8ff,#eef3ff)}
+.list-view-toolbar>span{font-size:11px;font-weight:900;letter-spacing:.09em;color:#5b6f91}
+.list-view-switch{display:flex;gap:6px;flex-wrap:wrap}
+.list-view-switch button{border:1px solid #cbd9ee;border-radius:10px;background:#fff;color:#425675;padding:10px 13px;font-weight:800;cursor:pointer;transition:all .18s}
+.list-view-switch button:hover{border-color:#2674ed;color:#1769e8}
+.list-view-switch button.active{background:linear-gradient(135deg,#1769e8,#5145e5);border-color:transparent;color:white;box-shadow:0 5px 13px #255be533}
+.list-order-groups{display:grid;gap:14px;margin-top:14px}
+.list-order-card{border:1px solid #d7e4f7;border-radius:15px;background:#fff;padding:14px;box-shadow:0 4px 14px #193a7508}
+.list-order-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 4px 12px}
+.list-order-head>div{display:grid;gap:4px}
+.list-order-head small,.list-order-total small{font-size:10px;font-weight:900;letter-spacing:.07em;color:#7183a0}
+.list-order-head strong{font-size:20px;color:#173568}
+.list-order-total{text-align:right}
+.list-order-total strong{color:#1769e8}
+.theme-black .list-view-toolbar{background:linear-gradient(120deg,#182538,#202e43);border-color:#3a4e68}
+.theme-black .list-view-toolbar>span{color:#b6c7dc}
+.theme-black .list-view-switch button{background:#26364b;border-color:#435771;color:#dce8f7}
+.theme-black .list-view-switch button.active{background:linear-gradient(135deg,#1688f8,#6657ef);color:#fff}
+.theme-black .list-order-card{background:#1e293b;border-color:#3a4e68}
+.theme-black .list-order-head strong{color:#edf5ff}
+.theme-black .list-order-head small,.theme-black .list-order-total small{color:#b6c7dc}
+@media(max-width:600px){.list-view-toolbar{align-items:stretch;flex-direction:column}.list-view-switch{display:grid;grid-template-columns:1fr}.list-view-switch button{width:100%}.list-order-head strong{font-size:17px}}
