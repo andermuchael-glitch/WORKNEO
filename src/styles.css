@@ -337,3 +337,12 @@ body.theme-black .top{background:linear-gradient(110deg,#101827,#17243a)!importa
 .theme-black .list-order-head strong{color:#edf5ff}
 .theme-black .list-order-head small,.theme-black .list-order-total small{color:#b6c7dc}
 @media(max-width:600px){.list-view-toolbar{align-items:stretch;flex-direction:column}.list-view-switch{display:grid;grid-template-columns:1fr}.list-view-switch button{width:100%}.list-order-head strong{font-size:17px}}
+
+
+.return-sort-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 18px;padding:12px 14px;border:1px solid #d8e5f8;border-radius:13px;background:linear-gradient(110deg,#f4f8ff,#eef4ff)}
+.return-sort-toolbar label{font-size:11px;font-weight:900;letter-spacing:.07em;color:#526a8b}
+.return-sort-toolbar select{min-width:220px;border:1px solid #cbd9ee;border-radius:10px;background:#fff;color:#142b4d;padding:10px 12px;font-weight:750}
+.return-sort-toolbar span{font-size:12px;color:#657b9b}
+.theme-black .return-sort-toolbar{background:linear-gradient(110deg,#182538,#202e43);border-color:#3a4e68}
+.theme-black .return-sort-toolbar label,.theme-black .return-sort-toolbar span{color:#b6c7dc}
+.theme-black .return-sort-toolbar select{background:#111c2d;color:#f1f5fb;border-color:#465873}
