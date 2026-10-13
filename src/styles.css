@@ -346,3 +346,7 @@ body.theme-black .top{background:linear-gradient(110deg,#101827,#17243a)!importa
 .theme-black .return-sort-toolbar{background:linear-gradient(110deg,#182538,#202e43);border-color:#3a4e68}
 .theme-black .return-sort-toolbar label,.theme-black .return-sort-toolbar span{color:#b6c7dc}
 .theme-black .return-sort-toolbar select{background:#111c2d;color:#f1f5fb;border-color:#465873}
+
+
+.product-search-input{width:100%;min-width:0}
+.product-search-hint{display:block;margin-top:6px;color:var(--muted,#657b9b);font-size:11px;line-height:1.35}
