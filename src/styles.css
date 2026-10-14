@@ -350,3 +350,27 @@ body.theme-black .top{background:linear-gradient(110deg,#101827,#17243a)!importa
 
 .product-search-input{width:100%;min-width:0}
 .product-search-hint{display:block;margin-top:6px;color:var(--muted,#657b9b);font-size:11px;line-height:1.35}
+
+
+/* Widget de lançamento rápido do WORKNEO */
+.quick-launch-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(10,23,45,.62);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.quick-launch-card{width:min(760px,100%);max-height:min(92dvh,860px);overflow:auto;padding:clamp(18px,4vw,30px);border:1px solid #d9e6fa;border-radius:24px;background:linear-gradient(145deg,#fff,#f4f8ff);box-shadow:0 28px 90px #071a3b50;color:#122849}
+.quick-launch-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}
+.quick-launch-heading .eyebrow{font-size:11px;font-weight:900;letter-spacing:.12em;color:#1769e8}
+.quick-launch-heading h2{margin:8px 0 6px;font-size:clamp(22px,4vw,30px);line-height:1.15;color:#142d53}
+.quick-launch-heading p{margin:0;color:#657b9b;font-size:14px;line-height:1.45}
+.quick-launch-close{flex:0 0 42px;width:42px;height:42px;border:1px solid #d5e2f5;border-radius:13px;background:#fff;color:#385577;font-size:29px;line-height:1;cursor:pointer}
+.quick-launch-list-label{display:grid;gap:8px;margin-bottom:16px;color:#526a8b;font-size:11px;font-weight:900;letter-spacing:.07em}
+.quick-launch-card select,.quick-launch-card input{width:100%;min-width:0;min-height:49px;padding:12px 13px;border:1px solid #cbd9ee;border-radius:12px;background:#fff;color:#122849;font:inherit;font-size:15px;letter-spacing:normal;box-sizing:border-box}
+.quick-launch-card select:focus,.quick-launch-card input:focus{outline:none;border-color:#2878f0;box-shadow:0 0 0 3px #2878f022}
+.quick-launch-form{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(110px,.65fr);gap:14px}
+.quick-launch-form label{display:grid;align-content:start;gap:8px;color:#526a8b;font-size:11px;font-weight:900;letter-spacing:.07em}
+.quick-launch-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.quick-launch-actions button{min-height:48px;padding:12px 18px;border-radius:12px;font-weight:900}
+.quick-launch-actions .primary{background:linear-gradient(135deg,#1769e8,#5145e5);color:#fff;border:0;box-shadow:0 8px 20px #255be533}
+.theme-black .quick-launch-card{background:linear-gradient(145deg,#1e293b,#172235);border-color:#3a4e68;color:#e8eef8}
+.theme-black .quick-launch-heading h2{color:#edf5ff}
+.theme-black .quick-launch-heading p,.theme-black .quick-launch-list-label,.theme-black .quick-launch-form label{color:#b6c7dc}
+.theme-black .quick-launch-card select,.theme-black .quick-launch-card input{background:#111c2d;color:#f1f5fb;border-color:#465873}
+.theme-black .quick-launch-close{background:#26364b;color:#e8eef8;border-color:#435771}
+@media(max-width:520px){.quick-launch-overlay{padding:10px;align-items:flex-end}.quick-launch-card{padding:20px 16px;border-radius:22px 22px 14px 14px;max-height:94dvh}.quick-launch-form{grid-template-columns:1fr 1fr;gap:12px}.quick-launch-form label:first-child{grid-column:1/-1}.quick-launch-actions{display:grid;grid-template-columns:.7fr 1.3fr}.quick-launch-actions button{padding:11px 9px;font-size:12px}}
