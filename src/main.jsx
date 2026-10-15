@@ -327,7 +327,7 @@ const currentList=lists.find(x=>x.id===selectedListId)||null,reportList=lists.fi
 const saveLists=v=>{setLists(v);write(LISTS_KEY,v)},saveReports=v=>{setReports(v);write(REPORTS_KEY,v)};
 const[projectSearch,setProjectSearch]=useState(''),[editingColorId,setEditingColorId]=useState(''),[editingColorValue,setEditingColorValue]=useState('');
 const projectQuery=norm(projectSearch);
-const filteredLists=useMemo(()=>lists.filter(l=>(l.items||[]).some(x=>n(x.qty)>0)).filter(l=>{if(!projectQuery)return true;const hay=[l.name,...(l.items||[]).flatMap(x=>[x.product,x.color,x.pedido,x.cliente,x.customer,x.tracking,x.codigoAcompanhamento,x.createdBy?.name,x.createdBy?.email])].join(' ');return norm(hay).includes(projectQuery)}),[lists,projectQuery]);
+const filteredLists=useMemo(()=>lists.filter(l=>Array.isArray(l.items)&&l.items.length>0).filter(l=>{if(!projectQuery)return true;const hay=[l.name,...(l.items||[]).flatMap(x=>[x.product,x.color,x.pedido,x.cliente,x.customer,x.tracking,x.codigoAcompanhamento,x.createdBy?.name,x.createdBy?.email])].join(' ');return norm(hay).includes(projectQuery)}),[lists,projectQuery]);
 const visibleCurrentItems=useMemo(()=>{const items=currentList?.items||[];const notYetSent=x=>n(x.qty)>0;if(!projectQuery)return items.filter(notYetSent);return items.filter(x=>notYetSent(x)&&norm([x.product,x.color,x.pedido,x.cliente,x.customer,x.tracking,x.codigoAcompanhamento,x.createdBy?.name,x.createdBy?.email,currentList?.name].join(' ')).includes(projectQuery))},[currentList,projectQuery]);
 const groupedCurrentItems=useMemo(()=>{
  const byProduct=new Map(),byOrder=new Map();
