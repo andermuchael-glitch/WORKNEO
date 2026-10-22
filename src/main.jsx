@@ -50,7 +50,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
  const reports=Array.isArray(data?.reports)?data.reports:[],lists=Array.isArray(data?.lists)?data.lists:[],share=data?.share||{};
  const search=String(filters.search||'').trim().toLowerCase();
  const onlySewing=Boolean(filters.onlySewing),showPending=Boolean(filters.showPending);
- const products=useMemo(()=>[...new Set(reports.flatMap(r=>(r.items||[]).map(i=>i.product).filter(Boolean)))].sort(),[reports]);
+ const products=useMemo(()=>[...new Set([...reports.flatMap(r=>(r.items||[]).map(i=>i.product).filter(Boolean)),...lists.flatMap(l=>(l.items||[]).map(i=>i.product).filter(Boolean))])].sort((a,b)=>a.localeCompare(b,'pt-BR',{sensitivity:'base'})),[reports,lists]);
  const costureiras=useMemo(()=>[...new Set(reports.map(r=>r.costureira).filter(Boolean))].sort(),[reports]);
  const baseRows=useMemo(()=>{
    const clean={...filters};delete clean.search;delete clean.onlySewing;
@@ -227,7 +227,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
        <button className="secondary-action theme-action" onClick={toggleBlackTheme}>{blackTheme?'☀️ TEMA CLARO':'🌙 TEMA BLACK'}</button>
      </div>
      <div className="tracking-search">
-       <label className="search-field"><span>🔎</span><input value={filters.search||''} onChange={e=>{setFilter({search:e.target.value});setProductionPanelOpen(false);if(e.target.value.trim())window.setTimeout(()=>document.getElementById('resultados-busca')?.scrollIntoView({behavior:'smooth',block:'start'}),80)}} placeholder="Pesquisar pedido, cliente ou código de acompanhamento" aria-label="Pesquisar pedido, cliente ou código de acompanhamento"/>{filters.search&&<button type="button" className="clear-search" onClick={()=>setFilter({search:''})} aria-label="Limpar busca">×</button>}</label>
+       <label className="search-field"><span>🔎</span><input value={filters.search||''} onChange={e=>{setFilter({search:e.target.value,product:''});setProductionPanelOpen(false);if(e.target.value.trim())window.setTimeout(()=>document.getElementById('resultados-busca')?.scrollIntoView({behavior:'smooth',block:'start'}),120)}} placeholder="Pesquisar pedido, cliente ou código de acompanhamento" aria-label="Pesquisar pedido, cliente ou código de acompanhamento"/>{filters.search&&<button type="button" className="clear-search" onClick={()=>setFilter({search:''})} aria-label="Limpar busca">×</button>}</label>
        <label className="tracking-toggle"><input type="checkbox" checked={onlySewing} onChange={e=>setFilter({onlySewing:e.target.checked})}/><span>Mostrar apenas pedidos na Costura</span></label>
      </div>
      <div className="status-filters" role="group" aria-label="Filtro rápido de status">
