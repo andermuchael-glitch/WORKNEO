@@ -318,6 +318,8 @@ function PublicShare({data,loading,error,filters,setFilters}){
 }
 function App(){
 const[blackTheme,toggleBlackTheme]=useBlackTheme();
+const[desktopView,setDesktopView]=useState(()=>{try{return localStorage.getItem('workneo-android-view')==='desktop'}catch{return false}});
+useEffect(()=>{try{localStorage.setItem('workneo-android-view',desktopView?'desktop':'mobile')}catch{}},[desktopView]);
 const quickLaunchRequested=useMemo(()=>new URLSearchParams(window.location.search).get('quickLaunch')==='1',[]);
 const[quickLaunchOpen,setQuickLaunchOpen]=useState(()=>new URLSearchParams(window.location.search).get('quickLaunch')==='1');
 const[tab,setTab]=useState('listas'),[lists,setLists]=useState(()=>removeEmptyListsOnLoad(read(LISTS_KEY)).cleaned),[reports,setReports]=useState(()=>read(REPORTS_KEY)),[sendControlOpen,setSendControlOpen]=useState(false),[returnControlOpen,setReturnControlOpen]=useState(false),[separationOrderSearch,setSeparationOrderSearch]=useState(''),[returnSortOrder,setReturnSortOrder]=useState('newest'),[returnQty,setReturnQty]=useState({}),[expandedSeamstress,setExpandedSeamstress]=useState(''),[expandedSeamstressMetric,setExpandedSeamstressMetric]=useState('sent'),[showArchivedSeparation,setShowArchivedSeparation]=useState(false);
