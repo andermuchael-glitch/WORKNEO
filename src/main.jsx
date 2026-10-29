@@ -141,6 +141,9 @@ function PublicShare({data,loading,error,filters,setFilters}){
      o.pending+=p.pending;o.pendingItems.push(p);if(p.color)o.colors.add(p.color);
    }
    return [...map.values()].filter(o=>{
+     // Mostrar somente pedidos com saldo real na costura ou itens ainda pendentes.
+     // Pedidos totalmente retornados/baixados não devem ocupar a lista principal.
+     if(o.sewing<=0&&o.pending<=0)return false;
      if(search){
        const hay=[o.pedido,o.cliente,o.tracking,...o.sentRows.map(r=>[r.product,r.listName,r.costureira].join(' ')),...o.pendingItems.map(r=>[r.product,r.color,r.listName].join(' '))].join(' ').toLowerCase();
        if(!hay.includes(search))return false;
