@@ -427,3 +427,10 @@ body.theme-black .top{background:linear-gradient(110deg,#101827,#17243a)!importa
  .mobile-view .view-mode-btn{order:5}
  .mobile-view .tabs button{padding:12px 13px}
 }
+
+/* Alternância entre totais consolidados e detalhamento por cor no acompanhamento */
+.order-view-switch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;padding:6px;border:1px solid #d8e3f5;border-radius:14px;background:#f4f7fc;width:max-content;max-width:100%}
+.order-view-switch button{border:1px solid transparent;border-radius:10px;padding:10px 15px;background:transparent;color:#425979;font-weight:800;font-size:12px;cursor:pointer;min-height:40px}
+.order-view-switch button.active{background:#1767e8;color:#fff;box-shadow:0 4px 12px #1767e833}
+.order-view-switch button:focus-visible{outline:3px solid #8bb8ff;outline-offset:2px}
+@media(max-width:520px){.order-view-switch{width:100%;display:grid;grid-template-columns:1fr 1fr}.order-view-switch button{padding:10px 8px;font-size:11px}}
