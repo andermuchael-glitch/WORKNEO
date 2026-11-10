@@ -154,6 +154,7 @@ function PublicShare({data,loading,error,filters,setFilters}){
    }).sort((a,b)=>String(a.pedido).localeCompare(String(b.pedido),undefined,{numeric:true}));
  },[baseRows,pendingItems,search,onlySewing,showPending]);
  const [expandedOrder,setExpandedOrder]=useState('');
+ const [orderViewMode,setOrderViewMode]=useState('colors');
  const [trackingTab,setTrackingTab]=useState('pedidos');
  const [showArchivedTrackingSeparation,setShowArchivedTrackingSeparation]=useState(false);
  const [materialsOpen,setMaterialsOpen]=useState(false);
@@ -269,18 +270,21 @@ function PublicShare({data,loading,error,filters,setFilters}){
    </section>
 
    <section className="panel" id="pedidos">
-     <div className="section-head"><div><div className="eyebrow">📦 CONTROLE POR PEDIDO</div><h2>Pedidos / Produção</h2><p>Clique em um pedido para expandir todos os detalhes.</p></div></div>
+     <div className="section-head"><div><div className="eyebrow">📦 CONTROLE POR PEDIDO</div><h2>Pedidos / Produção</h2><p>Clique em um pedido para expandir os detalhes e alternar entre totais e cores.</p></div></div>
      {orders.length?<div className="order-list">{orders.map(order=>{
        const status=statusFor(order),open=expandedOrder===order.pedido;
+       const productTotals=[...order.sentRows.reduce((map,r)=>{const key=norm(r.product||'—');const old=map.get(key)||{product:r.product||'—',sent:0,returned:0,sewing:0};old.sent+=n(r.qty);old.returned+=n(r.returnedQty);old.sewing+=n(r.sewingQty);map.set(key,old);return map},new Map()).values()];
+       const pendingByProduct=[...order.pendingItems.reduce((map,p)=>{const key=norm(p.product||'—');const old=map.get(key)||{product:p.product||'—',qty:0};old.qty+=n(p.pending);map.set(key,old);return map},new Map()).values()];
        return <article className={'order-card '+(open?'expanded':'')} key={order.pedido}>
          <button className="order-header" onClick={()=>setExpandedOrder(open?'':order.pedido)} aria-expanded={open}>
            <div className="order-main"><strong>{order.pedido==='SEM PEDIDO'?'Pedido sem número':'Pedido '+order.pedido}</strong>{order.cliente&&<span>{order.cliente}</span>}{order.tracking&&<small>🔗 {order.tracking}</small>}</div>
-           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase().replace(/\s+/g,'-')}>{status==='NA COSTURA'?'✓ Na Costura':status==='PARCIAL'?'↗ Parcial — Costura + Pendente':status==='RETORNADO'?'↩ Retornado à Separação':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sewing+order.returned+order.pending)} peças</b><span className="chevron">{open?'▲':'▼'}</span></div>
+           <div className="order-meta"><span className={'badge badge-'+status.toLowerCase().replace(/\s+/g,'-')}>{status==='NA COSTURA'?'✓ Na Costura':status==='PARCIAL'?'↗ Parcial — Costura + Pendente':status==='RETORNADO'?'↩ Retornado à Separação':'⚠ Pendente em Corte/Preparação'}</span><b>{fmt(order.sent+order.pending)} peças enviadas / pendentes</b><span className="chevron">{open?'▲':'▼'}</span></div>
          </button>
          {open&&<div className="order-details">
-           <div className="detail-grid"><div><span>ENVIADO À COSTURA</span><b>{fmt(order.sent)}</b></div><div><span>NA COSTURA</span><b>{fmt(order.sewing)}</b></div><div><span>RETORNOU</span><b>{fmt(order.returned)}</b></div><div><span>PENDENTE</span><b>{fmt(order.pending)}</b></div><div><span>CORES</span><b>{[...order.colors].join(', ')||'—'}</b></div></div>
-           {order.sentRows.length>0&&<div className="detail-block"><h3>✓ Enviado para Costura</h3><div className="table-wrap compact"><table><thead><tr><th>PRODUTO</th><th>ENVIADO</th><th>RETORNOU</th><th>NA COSTURA</th><th>COR</th><th>COSTUREIRA</th><th>DATA</th></tr></thead><tbody>{order.sentRows.map((r,i)=><tr key={i}><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{fmt(r.returnedQty)}</td><td><b>{fmt(r.sewingQty)}</b></td><td>{r.color||'—'}</td><td>{r.costureira||'—'}</td><td>{fmtDate(r.date)}</td></tr>)}</tbody></table></div></div>}
-           {order.pendingItems.length>0&&<div className="detail-block"><h3>⏳ Ainda pendente</h3><div className="pending-mini">{order.pendingItems.map((p,i)=><div className="pending-line" key={p.key+'-'+i}><span className="color-dot">{p.color}</span><b>{p.product}</b><span>{fmt(p.pending)} peças</span>{p.listName&&<small>{p.listName}</small>}</div>)}</div></div>}
+           <div className="order-view-switch" role="group" aria-label="Modo de visualização do pedido"><button type="button" className={orderViewMode==='totals'?'active':''} onClick={()=>setOrderViewMode('totals')}>🔢 TOTAL DE PEÇAS</button><button type="button" className={orderViewMode==='colors'?'active':''} onClick={()=>setOrderViewMode('colors')}>🎨 VER POR COR</button></div>
+           <div className="detail-grid"><div><span>TOTAL ENVIADO À COSTURA</span><b>{fmt(order.sent)}</b></div><div><span>AINDA NA COSTURA</span><b>{fmt(order.sewing)}</b></div><div><span>RETORNOU</span><b>{fmt(order.returned)}</b></div><div><span>PENDENTE DE ENVIO</span><b>{fmt(order.pending)}</b></div>{orderViewMode==='colors'&&<div><span>CORES</span><b>{[...order.colors].join(', ')||'—'}</b></div>}</div>
+           {order.sentRows.length>0&&<div className="detail-block"><h3>✓ Enviado para Costura</h3><div className="table-wrap compact"><table><thead><tr><th>PRODUTO</th><th>ENVIADO</th><th>RETORNOU</th><th>NA COSTURA</th>{orderViewMode==='colors'&&<><th>COR</th><th>COSTUREIRA</th><th>DATA</th></>}</tr></thead><tbody>{orderViewMode==='totals'?productTotals.map((r,i)=><tr key={r.product+'-'+i}><td><b>{r.product}</b></td><td>{fmt(r.sent)}</td><td>{fmt(r.returned)}</td><td><b>{fmt(r.sewing)}</b></td></tr>):order.sentRows.map((r,i)=><tr key={i}><td>{r.product}</td><td>{fmt(r.qty)}</td><td>{fmt(r.returnedQty)}</td><td><b>{fmt(r.sewingQty)}</b></td><td>{r.color||'—'}</td><td>{r.costureira||'—'}</td><td>{fmtDate(r.date)}</td></tr>)}</tbody></table></div></div>}
+           {order.pendingItems.length>0&&<div className="detail-block"><h3>⏳ Ainda pendente</h3><div className="pending-mini">{orderViewMode==='totals'?pendingByProduct.map((p,i)=><div className="pending-line" key={p.product+'-'+i}><b>{p.product}</b><strong>{fmt(p.qty)} peças</strong></div>):order.pendingItems.map((p,i)=><div className="pending-line" key={p.key+'-'+i}><span className="color-dot">{p.color}</span><b>{p.product}</b><span>{fmt(p.pending)} peças</span>{p.listName&&<small>{p.listName}</small>}</div>)}</div></div>}
          </div>}
        </article>
      })}</div>:<div className="empty">Nenhum pedido encontrado com os filtros atuais.</div>}
