@@ -6,7 +6,7 @@ import{FileOpener}from'@capacitor-community/file-opener';
 import html2pdf from'html2pdf.js';
 import{MATERIAL_RULES}from'./materialRules.js';
 import{isSupabaseConfigured,supabase,loadCloudData,saveCloudData,subscribeToCloud,AUTH_REDIRECT_URL,ensureWorkspace,loadWorkspaceData,saveWorkspaceData,listWorkspaceMembers,addWorkspaceMember,setWorkspaceMemberRole,removeWorkspaceMember,subscribeToWorkspaceData}from'./supabaseClient.js';
-import{createProductionShare,listProductionShares,revokeProductionShare,loadPublicProductionShare,filterProductionRows}from'./productionShare.js';
+import{createProductionShare,listProductionShares,revokeProductionShare,loadPublicProductionShare,loadPublicProductionShareVersion,filterProductionRows}from'./productionShare.js';
 import'./styles.css';
 
 const PRODUCTS=["PORTA GARRAFA LITRÃO","PORTA GARRAFA 600","PORTA GARRAFA 600 SEM ZÍPER","PORTA ÁGUA E ISOTÔNICO","BOLSA DE MÃO","BOLSA MEIA LUA","BARMAT","BARMAT GRANDE","LANCHEIRA","BOLSA FEMININA","CASE CELULAR","CASE NOTEBOOK","CORRENTE PARA ÓCULOS","CASE TABLET","CARTEIRA FEMININA","COOLER TÉRMICO LATERAL","PORTA ESPUMANTE 975ML","ESTOJO","PORTA GARRAFA LONG NECK 355ML","LIXEIRA AUTOMOTIVA","PORTA LATA 350ML","PORTA LATA 473ML","PORTA LATA PALITO 269ML","PORTA LATA PALITO 350ML","KIT LUVA DE FORNO","MÁSCARA PROTETORA","MATEIRA","MATEIRA PEQUENA","MINI BAG GRANDE LATERAL","PORTA MOEDAS","MOCHILA INFANTIL","MOCHILA TÉRMICA","MOUSE PAD","MOUSE PAD GAMER","MUNHEQUEIRA","NECESSAIRE","NECESSAIRE GRANDE","POCHETE","PORTA COPOS","PROTETOR FACIAL","PORTA ÓCULOS","PORTA SQUEEZE","PORTA VINHO DUPLO","PORTA VINHO DUPLO C/ PORTA TAÇAS","PORTA VINHO SIMPLES","MOCHILA TRANSVERSAL","MINI BAG PEQUENA TRANSVERSAL","TAG PARA MALA","COOLER TÉRMICO GRANDE","COOLER TÉRMICO PEQUENO","TAPA OLHO","VISEIRA","LATA CAMISA","LONG CAMISA","CANGA DE PRAIA","CANGA DE PRAIA G","MARMITEIRA IMPERMEÁVEL","MOCHILA IMPERMEÁVEL","VISEIRA TURBANTE","ESTEIRA DE PRAIA","WINE CASE DELUXE","WINE BAG","CAPA DE MALA P","CAPA DE MALA M","CAPA DE MALA G"];
@@ -396,9 +396,10 @@ useEffect(()=>{
 
 useEffect(()=>{
   if(!shareToken||!isSupabaseConfigured||!supabase)return;
-  let alive=true;
-  const load=async()=>{try{const data=await loadPublicProductionShare(shareToken);if(alive){setPublicShare(data);setPublicShareError('');setPublicShareLoading(false)}}catch(error){console.error(error);if(alive){setPublicShareError(error?.message||'Link inválido ou desativado.');setPublicShareLoading(false)}}};
-  load();const timer=setInterval(load,5000);return()=>{alive=false;clearInterval(timer)};
+  let alive=true;let lastVersion='';
+  const load=async()=>{try{const data=await loadPublicProductionShare(shareToken);if(alive){setPublicShare(data);setPublicShareError('');setPublicShareLoading(false);lastVersion=data?.server_time||''}}catch(error){console.error(error);if(alive){setPublicShareError(error?.message||'Link inválido ou desativado.');setPublicShareLoading(false)}}};
+  const check=async()=>{try{const version=await loadPublicProductionShareVersion(shareToken);if(!alive)return;if(version!==lastVersion){await load()}}catch(error){console.error('Falha ao verificar atualização do acompanhamento:',error)}};
+  load();const timer=setInterval(check,30000);return()=>{alive=false;clearInterval(timer)};
 },[shareToken]);
 
 useEffect(()=>{
