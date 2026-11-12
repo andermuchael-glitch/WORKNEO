@@ -397,7 +397,7 @@ useEffect(()=>{
 useEffect(()=>{
   if(!shareToken||!isSupabaseConfigured||!supabase)return;
   let alive=true;let lastVersion='';
-  const load=async()=>{try{const data=await loadPublicProductionShare(shareToken);if(alive){setPublicShare(data);setPublicShareError('');setPublicShareLoading(false);lastVersion=data?.server_time||''}}catch(error){console.error(error);if(alive){setPublicShareError(error?.message||'Link inválido ou desativado.');setPublicShareLoading(false)}}};
+  const load=async()=>{try{const data=await loadPublicProductionShare(shareToken);if(alive){setPublicShare(data);setPublicShareError('');setPublicShareLoading(false);lastVersion=await loadPublicProductionShareVersion(shareToken)}}catch(error){console.error(error);if(alive){setPublicShareError(error?.message||'Link inválido ou desativado.');setPublicShareLoading(false)}}};
   const check=async()=>{try{const version=await loadPublicProductionShareVersion(shareToken);if(!alive)return;if(version!==lastVersion){await load()}}catch(error){console.error('Falha ao verificar atualização do acompanhamento:',error)}};
   load();const timer=setInterval(check,30000);return()=>{alive=false;clearInterval(timer)};
 },[shareToken]);
