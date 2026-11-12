@@ -33,6 +33,13 @@ export async function loadPublicProductionShare(token){
   return data;
 }
 
+export async function loadPublicProductionShareVersion(token){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.rpc('get_workneo_share_version',{p_token:token});
+  if(error) throw error;
+  return String(data?.updated_at||'');
+}
+
 export function filterProductionRows(share,filters){
   const reports=Array.isArray(share?.reports)?share.reports:[];
   const start=filters.startDate||'0000-01-01', end=filters.endDate||'9999-12-31';
