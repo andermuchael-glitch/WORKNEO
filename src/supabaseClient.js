@@ -136,18 +136,27 @@ export async function removeWorkspaceMember(workspaceId,userId){
 export function subscribeToWorkspaceData(workspaceId,onData,onStatus){
   if(!supabase||!workspaceId) return ()=>{};
   let alive=true;
+  let lastVersion='';
+  const loadFull=async()=>{
+    const {data,error}=await supabase.rpc('get_workneo_workspace_data',{p_workspace_id:workspaceId});
+    if(error)throw error;
+    if(!alive)return;
+    lastVersion=data?.updated_at||'';
+    onData(data);
+  };
   const poll=async()=>{
     try{
-      const {data,error}=await supabase.rpc('get_workneo_workspace_data',{p_workspace_id:workspaceId});
-      if(!alive)return;
+      const {data,error}=await supabase.rpc('get_workneo_workspace_version',{p_workspace_id:workspaceId});
       if(error)throw error;
-      onData(data);
+      if(!alive)return;
+      const version=String(data?.updated_at||'');
+      if(version&&version!==lastVersion)await loadFull();
       onStatus?.('SUBSCRIBED');
     }catch(error){
       if(alive)onStatus?.('CHANNEL_ERROR',error);
     }
   };
-  poll();
-  const timer=setInterval(poll,5000);
+  loadFull().then(()=>onStatus?.('SUBSCRIBED')).catch(error=>onStatus?.('CHANNEL_ERROR',error));
+  const timer=setInterval(poll,30000);
   return ()=>{alive=false;clearInterval(timer)};
 }
